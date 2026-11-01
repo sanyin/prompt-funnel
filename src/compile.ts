@@ -15,6 +15,7 @@ import type { FunnelConfig } from './config.js';
 import { gate } from './gate.js';
 import { requestSpec } from './llm.js';
 import { renderSpec } from './render.js';
+import { redactAll, scanSecrets } from './redact.js';
 import { applyTemplate, getTemplate } from './templates.js';
 import { checkFidelity, coerceSpec } from './validate.js';
 
@@ -34,11 +35,17 @@ const errorMessage = (error: unknown): string => (error instanceof Error ? error
  * every message instead of a modal the user learns to skip.
  */
 export async function compile(raw: string, options: CompileOptions = {}, deps: CompileDeps = {}): Promise<CompileResult> {
-  const source = raw.trim();
-  if (source.length === 0) throw new Error('输入为空');
+  const trimmed = raw.trim();
+  if (trimmed.length === 0) throw new Error('输入为空');
 
   const config = deps.config ?? loadConfig();
   const style: StyleName = options.style ?? config.style;
+
+  // Sensitive material is reported, never silently removed. `redact: 'on'` is the
+  // caller opting in to replacement; the default only surfaces the finding.
+  const redactions = options.redact === 'off' ? [] : scanSecrets(trimmed);
+  const source = options.redact === 'on' && redactions.length > 0 ? redactAll(trimmed, redactions) : trimmed;
+
   const verdict = gate(source);
   const notes: string[] = [];
 
@@ -51,6 +58,7 @@ export async function compile(raw: string, options: CompileOptions = {}, deps: C
       spec: base,
       rendered: { text: `${source}\n`, fidelity, keptOriginal: false },
       passedThrough: true,
+      redactions,
       notes: ['闸门判定：已足够清晰，原样放行（加 --force 可强制收束）'],
     };
   }
@@ -95,7 +103,7 @@ export async function compile(raw: string, options: CompileOptions = {}, deps: C
     ...(options.keepOriginal !== undefined ? { keepOriginal: options.keepOriginal } : {}),
   });
 
-  return { spec, rendered, passedThrough: false, notes };
+  return { spec, rendered, passedThrough: false, redactions, notes };
 }
 
 /** Rule-only analysis, for callers that want the spec without rendering. */
@@ -108,3 +116,5 @@ export function analyze(raw: string, options: CompileOptions = {}): PromptSpec {
   if (template.id !== 'default') spec = applyTemplate(spec, template);
   return spec;
 }
+
+

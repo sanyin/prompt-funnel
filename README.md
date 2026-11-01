@@ -35,15 +35,20 @@ npx prompt-funnel gate   "帮我优化一下这个东西"    # 只看判定，�
 
 零运行时依赖，不需要 API key，离线可用。Node ≥ 22。
 
-## 五种用法
+## 六种用法
 
 | 入口 | 适合 | 怎么用 |
 | --- | --- | --- |
+| **网页** | 不装任何东西，先用一眼 | `npm run playground` |
+| **浏览器扩展** | 在 ChatGPT / Claude / DeepSeek 里直接补 | `npm run build:extension`（[安装](./extension/README.md)） |
 | **CLI** | 终端、脚本、管道 | `npx prompt-funnel review "..."` |
 | **MCP** | 任何 agent：DSH / Codex / Claude Code / Cursor | `npx -y prompt-funnel mcp` |
 | **Hook** | Claude Code 发送前自动收束 | `funnel hook`（[配置](./adapters/claude-code/README.md)） |
 | **Skill** | 让 agent 自己知道何时该收束 | `node adapters/install.mjs codex` |
-| **网页** | 不装任何东西，先用一眼 | `npm run playground` |
+
+![extension](docs/assets/extension.png)
+
+扩展不拦截发送：你点它，它才出现；点「插回输入框」，它把结果写回去，你照常按发送。
 
 MCP 只做确定性的事（判定 / 分析 / 校验 / 渲染），**语义工作交给宿主自己的模型**：不需要第二个 key，也不额外花 token。六个工具：
 
@@ -62,8 +67,9 @@ MCP 只做确定性的事（判定 / 分析 / 校验 / 渲染），**语义工�
 | --- | --- |
 | 判定要不要收束，清晰的**逐字节原样放行** | 不润色你的措辞（改写是编造的主要来源） |
 | 拆出目标 / 要求 / 约束 / 非目标 / 验收 | 不替你决定范围、受众、技术栈 |
-| 不确定的写成假设，最多问 3 个问题 | 不做问卷，不要求你填表 |
+| 把缺失变成**点一下就答的问题**，最多 3 个 | 不做问卷，不要求你写作文 |
 | 校验输出里的数字、路径、标识符是否来自原文 | 不用「更好的措辞」换掉你的原话 |
+| 扫出要发出去的密钥、手机号、内网地址 | **不替你改字**：打不打码你决定 |
 | 追问时带上已确认的上下文 | 不猜「继续」是什么意思 |
 
 ## 四个设计决定

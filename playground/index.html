@@ -78,6 +78,13 @@
       .status b { font-weight: 600; }
       .status.ok { color: var(--accent); }
       .status.todo { color: var(--warn); }
+      .secrets { margin-top: 12px; border: 1px solid color-mix(in srgb, var(--warn) 40%, var(--line)); background: color-mix(in srgb, var(--warn) 8%, transparent); border-radius: 10px; padding: 11px 12px; }
+      .secrets h2 { font-size: 12.5px; margin: 0 0 6px; color: var(--warn); font-weight: 600; }
+      .secrets ul { margin: 0; padding-left: 0; list-style: none; display: grid; gap: 6px; }
+      .secrets li { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 12.5px; }
+      .secrets li button { font: inherit; font-size: 12px; padding: 2px 9px; border-radius: 6px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); cursor: pointer; }
+      .secrets li button:hover { border-color: var(--warn); color: var(--warn); }
+      .secrets .foot { margin-top: 7px; font-size: 11.5px; color: var(--muted); }
       .questions { margin-top: 12px; display: grid; gap: 10px; }
       .q { border: 1px solid var(--line); border-radius: 10px; padding: 12px; background: var(--bg); }
       .q-title { font-size: 13.5px; margin-bottom: 10px; }
@@ -140,6 +147,7 @@
         <label for="input">你要发给 AI 的话</label>
         <textarea id="input" spellcheck="false" placeholder="例如：帮我优化一下这个东西"></textarea>
         <div class="chips" id="samples"></div>
+        <div id="secrets"></div>
         <div class="status" id="status"></div>
         <div class="answers" id="answers"></div>
         <div class="questions" id="questions"></div>
@@ -193,6 +201,7 @@
       import { renderSpec } from './dist/render.js';
       import { applyTemplate, getTemplate } from './dist/templates.js';
       import { answerQuestion, questionsFor } from './dist/questions.js';
+      import { describe as describeSecret, redactOne, scanSecrets } from './dist/redact.js';
 
       const input = document.getElementById('input');
       const statusEl = document.getElementById('status');
@@ -287,6 +296,34 @@
         }
       }
 
+      /** List what would leak, with a one-click fix per line. Never edits silently. */
+      function renderSecrets(findings) {
+        const box = document.getElementById('secrets');
+        if (findings.length === 0) {
+          box.innerHTML = '';
+          return;
+        }
+        const items = findings
+          .map(
+            (finding, index) =>
+              `<li><span>${escapeHtml(describeSecret(finding.kind))}（${finding.text.length} 字符）</span><button data-index="${index}">打码</button></li>`,
+          )
+          .join('');
+        box.innerHTML = `
+          <div class="secrets">
+            <h2>⚠ 这段话里有 ${findings.length} 处敏感信息</h2>
+            <ul>${items}</ul>
+            <div class="foot">发出去就收不回来了。打码只改这一处，其余不动。</div>
+          </div>`;
+        box.querySelectorAll('button[data-index]').forEach((button) => {
+          button.addEventListener('click', () => {
+            input.value = redactOne(input.value, Number(button.dataset.index));
+            answers.clear();
+            render();
+          });
+        });
+      }
+
       function render() {
         const text = input.value.trim();
         answersEl.innerHTML = '';
@@ -295,6 +332,7 @@
         if (text.length === 0) {
           statusEl.textContent = '粘一句话进来试试。';
           statusEl.className = 'status';
+          document.getElementById('secrets').innerHTML = '';
           out.textContent = '';
           count.textContent = '收束后的版本';
           axesEl.innerHTML = '';
@@ -302,6 +340,8 @@
           fidelityEl.textContent = '';
           return;
         }
+
+        renderSecrets(scanSecrets(text));
 
         const verdict = gate(text);
         const base = analyzeWithRules(text, verdict);

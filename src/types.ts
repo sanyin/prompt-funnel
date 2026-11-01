@@ -9,7 +9,11 @@
  * @module prompt-funnel/types
  */
 
+import type { Finding } from './redact.js';
+
 /** What kind of request the source text appears to be. */
+export type { Finding } from './redact.js';
+
 export type IntentClass = 'execute' | 'answer' | 'debug' | 'write' | 'plan' | 'unknown';
 
 /**
@@ -175,14 +179,20 @@ export interface CompileOptions {
   keepOriginal?: 'auto' | 'on' | 'off';
   /** Intent template id (see `funnel templates`). */
   template?: string;
+  /** `warn` (default) reports sensitive spans; `on` replaces them; `off` skips the scan. */
+  redact?: 'off' | 'warn' | 'on';
   now?: string;
 }
 
 /** Result of a full compile pass. */
 export interface CompileResult {
+  /** Sensitive spans found in the source (and replaced when `redact: 'on'`). */
+  redactions: Finding[];
   spec: PromptSpec;
   rendered: RenderResult;
   /** True when the gate decided the source was already clear. */
   passedThrough: boolean;
   notes: string[];
 }
+
+

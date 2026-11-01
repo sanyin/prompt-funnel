@@ -22,6 +22,8 @@ export { analyzeWithRules } from './analyze.js';
 export { renderSpec, shouldKeepOriginal } from './render.js';
 export { applyPatches, parseRefineNote, REFINE_FORMS } from './refine.js';
 export type { Patch, RefineResult, Section } from './refine.js';
+export { redactAll, redactOne, scanSecrets, marker, describe } from './redact.js';
+export type { Finding, RedactKind } from './redact.js';
 export { answerAll, answerQuestion, questionsFor } from './questions.js';
 export type { Question } from './questions.js';
 export { applyTemplate, getTemplate, TEMPLATES, templateIds } from './templates.js';
@@ -55,4 +57,5 @@ export type {
   SpecMeta,
   StyleName,
 } from './types.js';
+
 

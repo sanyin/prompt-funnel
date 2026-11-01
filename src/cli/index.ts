@@ -15,6 +15,7 @@ import { compile } from '../compile.js';
 import { configPath, loadConfig, resolveApiKey, saveConfig } from '../config.js';
 import { gate } from '../gate.js';
 import { applyPatches, REFINE_FORMS, parseRefineNote } from '../refine.js';
+import { describe as describeSecret } from '../redact.js';
 import { renderSpec } from '../render.js';
 import { composeContinuation } from '../session.js';
 import { saveSpec, loadSpec, textPath } from '../store.js';
@@ -109,8 +110,10 @@ async function commandCompile(args: Args): Promise<number> {
   const keepOriginal = flagValue(args, 'keep-original') as 'auto' | 'on' | 'off' | undefined;
   const template = flagValue(args, 'template');
 
+  const redact = flagOn(args, 'redact') ? 'on' : flagOn(args, 'no-redact') ? 'off' : 'warn';
   const result = await compile(raw, {
     force: flagOn(args, 'force'),
+    redact,
     ...(style !== undefined ? { style } : {}),
     ...(engine !== undefined ? { engine } : {}),
     ...(keepOriginal !== undefined ? { keepOriginal } : {}),
@@ -136,6 +139,17 @@ async function commandCompile(args: Args): Promise<number> {
     if (estimateTokens(output.rendered.text) > budget) {
       note(paint.yellow(`压缩后仍超出预算（${estimateTokens(output.rendered.text)} > ${budget}）；长请求的收益本来就小，可以直接发原文`));
     }
+  }
+
+  if (output.redactions.length > 0) {
+    note(paint.yellow(`⚠ 这段输入里有 ${output.redactions.length} 处敏感信息：`));
+    const seen = new Set();
+    for (const finding of output.redactions) {
+      if (seen.has(finding.kind)) continue;
+      seen.add(finding.kind);
+      note(paint.yellow(`   · ${describeSecret(finding.kind)}（${finding.text.length} 字符）`));
+    }
+    note(paint.dim('   --redact 会在收束前打码；不打码则会原样送出'));
   }
 
   if (output.passedThrough) note(paint.green('✓ 闸门放行：已足够清晰，未改写'));

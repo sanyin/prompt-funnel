@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <title>prompt-funnel 扩展测试页</title>
+    <style>
+      body { font: 15px/1.6 -apple-system, "PingFang SC", sans-serif; margin: 40px auto; max-width: 720px; }
+      textarea { width: 100%; min-height: 120px; padding: 12px; font: inherit; }
+      .hint { color: #666; font-size: 13px; }
+    </style>
+  </head>
+  <body>
+    <h1>假装这是一个聊天页面</h1>
+    <p class="hint">
+      用来本地验证扩展：页面右下角应该出现「⇥ 把话问清楚」按钮。这个文件被浏览器直接打开时不加载扩展，
+      需要通过 http://localhost 提供（扩展只匹配 http(s) 站点）。
+    </p>
+    <textarea id="prompt" placeholder="给 AI 发消息"></textarea>
+  </body>
+</html>

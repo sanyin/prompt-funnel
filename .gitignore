@@ -9,3 +9,4 @@ Thumbs.db
 .env
 .env.*
 pnpm-lock.yaml
+extension/core/

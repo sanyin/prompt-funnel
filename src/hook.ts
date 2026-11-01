@@ -17,6 +17,7 @@
  */
 
 import { analyzeWithRules } from './analyze.js';
+import { describe as describeSecret, scanSecrets } from './redact.js';
 import { gate } from './gate.js';
 import { renderSpec } from './render.js';
 
@@ -66,6 +67,13 @@ export function runHook(payload: HookPayload, options: { mode?: HookMode; force?
   const verdict = gate(prompt);
   if (verdict.decision === 'pass' && options.force !== true) return silent('clear');
 
+  // The hook cannot stop the send, but it can say what is about to leave.
+  const findings = scanSecrets(prompt);
+  const warning =
+    findings.length === 0
+      ? ''
+      : `⚠ 这段输入里有 ${findings.length} 处敏感信息（${[...new Set(findings.map((f) => describeSecret(f.kind)))].join('、')}），会随原文一起发送。\n\n`;
+
   const spec = analyzeWithRules(prompt, verdict);
   const rendered = renderSpec(spec, { keepOriginal: 'off' });
   const text = rendered.text.trimEnd();
@@ -89,7 +97,7 @@ export function runHook(payload: HookPayload, options: { mode?: HookMode; force?
     stdout: JSON.stringify({
       hookSpecificOutput: {
         hookEventName: 'UserPromptSubmit',
-        additionalContext: `【prompt-funnel 已把这条请求收束成以下结构；缺失信息按"假定"处理，若不符请纠正】\n\n${text}`,
+        additionalContext: `${warning}【prompt-funnel 已把这条请求收束成以下结构；缺失信息按"假定"处理，若不符请纠正】\n\n${text}`,
       },
     }),
     stderr: '',
