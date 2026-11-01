@@ -60,38 +60,72 @@ export interface Continuation {
 }
 
 /**
+ * How much of the previous turn to re-send.
+ *
+ * - `full` — objective, requirements, deliverable, acceptance. Correct for a
+ *   stateless one-shot (CLI, piping into another tool).
+ * - `minimal` — the thread's root objective only. Correct when the host already
+ *   has the conversation in context: repeating the requirements buys nothing and
+ *   costs tokens every turn.
+ * - `off` — nothing. The increment only.
+ */
+export type CarryMode = 'full' | 'minimal' | 'off';
+
+/** The thread's original objective, following any chain of continuations. */
+export function rootObjective(spec: PromptSpec): string {
+  if (spec.carried === undefined) return spec.objective.text;
+  const match = /^目标：(.*)$/mu.exec(spec.carried.text);
+  return match?.[1]?.trim() ?? spec.objective.text;
+}
+
+/**
  * Build the spec for a follow-up turn.
  *
  * The follow-up is analysed on its own (so its own requirements and constraints
- * still count), then the previous turn is attached as settled context. The
- * combined source text is recorded so fidelity is checked against everything the
- * user has actually said in this thread.
+ * still count), then the previous turn is attached as settled context — unless
+ * the caller says the host already has it. The combined source text is recorded
+ * so fidelity is checked against everything the user has actually said.
  */
-export function composeContinuation(previous: PromptSpec | undefined, followUp: string): Continuation {
+export function composeContinuation(
+  previous: PromptSpec | undefined,
+  followUp: string,
+  options: { carry?: CarryMode } = {},
+): Continuation {
   const text = followUp.trim();
   if (text.length === 0) throw new Error('输入为空');
 
   const current = analyzeWithRules(text, gate(text));
   const notes: string[] = [];
+  const carry: CarryMode = options.carry ?? 'full';
 
   if (previous === undefined) {
     notes.push('没有上一轮的 spec，按普通请求处理');
     return { spec: current, notes };
   }
 
-  const carried = summarize(previous);
+  const meta = {
+    ...current.meta,
+    source: `${previous.meta.source}\n\n${text}`,
+    carry,
+    ...(previous.meta.template !== undefined ? { template: previous.meta.template } : {}),
+  };
+
+  if (carry === 'off') {
+    notes.push('未携带上文（假定宿主已有对话历史）');
+    return { spec: { ...current, meta }, notes };
+  }
+
+  const carried = carry === 'minimal' ? `目标：${rootObjective(previous)}` : summarize(previous);
   const spec: PromptSpec = {
     ...current,
     carried: { text: carried, source: 'inferred' },
-    meta: {
-      ...current.meta,
-      source: `${previous.meta.source}\n\n${text}`,
-      ...(previous.meta.template !== undefined ? { template: previous.meta.template } : {}),
-    },
+    meta,
   };
 
-  // Turn-local questions would be answered by the carried context; keep only the
-  // ones the follow-up itself genuinely leaves open.
-  notes.push(`已带上上一轮：${previous.objective.text.slice(0, 40)}`);
+  notes.push(
+    carry === 'minimal'
+      ? `只带上根目标：${rootObjective(previous).slice(0, 40)}`
+      : `已带上上一轮：${previous.objective.text.slice(0, 40)}`,
+  );
   return { spec, notes };
 }

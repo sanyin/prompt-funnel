@@ -112,6 +112,13 @@ const TOOLS: ToolDefinition[] = [
       properties: {
         text: { type: 'string', description: 'This turn only — what is being added or changed.' },
         spec: { type: 'object', description: 'Previous spec. Omit to use the most recent one on disk.' },
+        carry: {
+          type: 'string',
+          enum: ['minimal', 'full', 'off'],
+          description:
+            'How much of the previous turn to re-send. Default minimal (the host already has the conversation); ' +
+            'full repeats requirements, for hosts with no history.',
+        },
         style: { type: 'string', enum: STYLE_ENUM },
         keepOriginal: { type: 'string', enum: ['auto', 'on', 'off'] },
       },
@@ -312,7 +319,12 @@ async function callTool(name: string, args: unknown): Promise<string> {
           : undefined;
       const previous = fromCall ?? loadSpec();
 
-      const { spec, notes } = composeContinuation(previous, text);
+      // A chat host already has the conversation; repeating the requirements
+      // every turn is pure duplication. The CLI defaults to full because it is
+      // usually stateless.
+      const carryRaw = record['carry'];
+      const carry = carryRaw === 'full' || carryRaw === 'minimal' || carryRaw === 'off' ? carryRaw : 'minimal';
+      const { spec, notes } = composeContinuation(previous, text, { carry });
       const style = styleOf(record['style']);
       const keepOriginal = keepOf(record['keepOriginal']);
       const rendered = renderSpec(spec, {

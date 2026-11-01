@@ -114,6 +114,8 @@ export interface SpecMeta {
   note?: string;
   /** Id of the intent template that shaped this spec, if any. */
   template?: string;
+  /** Set on continuation turns: how much of the previous turn was carried. */
+  carry?: 'full' | 'minimal' | 'off';
 }
 
 /** Which analyzer produced the spec. */

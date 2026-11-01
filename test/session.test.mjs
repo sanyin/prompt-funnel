@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { analyzeWithRules, composeContinuation, renderSpec, summarize } from '../dist/index.js';
+import { analyzeWithRules, composeContinuation, renderSpec, rootObjective, summarize } from '../dist/index.js';
 
 const previous = () =>
   analyzeWithRules('帮我写一个爬虫，同时加上代理池，另外再做一个可视化面板');
@@ -50,3 +50,38 @@ test('the rendered prompt shows the carried block before the new objective', () 
 test('an empty follow-up is rejected', () => {
   assert.throws(() => composeContinuation(previous(), '   '), /输入为空/);
 });
+
+test('carry=off sends the increment alone', () => {
+  const { spec, notes } = composeContinuation(previous(), '再补一个断点续传', { carry: 'off' });
+  assert.equal(spec.carried, undefined);
+  assert.ok(notes.some((entry) => entry.includes('未携带')));
+});
+
+test('carry=minimal keeps the root objective but drops the requirements', () => {
+  const { spec } = composeContinuation(previous(), '再补一个断点续传', { carry: 'minimal' });
+  assert.match(spec.carried.text, /目标：帮我写一个爬虫/);
+  assert.doesNotMatch(spec.carried.text, /代理池/);
+});
+
+test('the root objective survives a chain of continuations', () => {
+  const first = composeContinuation(previous(), '再补一个断点续传').spec;
+  const second = composeContinuation(first, '再加个日志', { carry: 'minimal' }).spec;
+  assert.equal(rootObjective(second), '帮我写一个爬虫');
+});
+
+test('a continuation does not re-attach the growing transcript by default', () => {
+  const { spec } = composeContinuation(previous(), '再补一个断点续传');
+  const auto = renderSpec(spec); // keepOriginal defaults to auto
+  assert.equal(auto.keptOriginal, false);
+
+  const forced = renderSpec(spec, { keepOriginal: 'on' });
+  assert.equal(forced.keptOriginal, true);
+});
+
+test('carry modes are monotonically cheaper', () => {
+  const size = (mode) =>
+    renderSpec(composeContinuation(previous(), '再补一个断点续传', { carry: mode }).spec).text.length;
+  assert.ok(size('minimal') < size('full'));
+  assert.ok(size('off') < size('minimal'));
+});
+

@@ -1,6 +1,6 @@
 {
   "name": "prompt-funnel",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "A convergence gate for AI agents: turn a vague request into a precise, auditable prompt before it reaches the model.",
   "type": "module",
   "bin": {
@@ -61,3 +61,4 @@
     "typescript": "^5.9.3"
   }
 }
+

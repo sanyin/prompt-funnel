@@ -88,6 +88,16 @@ function emit(text: string, spec: PromptSpec, args: Args): void {
   process.stdout.write(text);
 }
 
+/** Report what this turn costs, in absolute tokens. */
+function reportCost(beforeText: string, afterText: string, passedThrough = false): void {
+  const before = estimateTokens(beforeText);
+  const after = estimateTokens(afterText);
+  const growth = after - before;
+  // A ratio on a ten-token input says nothing; the absolute overhead is the cost.
+  const ratio = before >= 40 ? `, ${(growth / before).toFixed(1)}×` : '';
+  note(paint.dim(`tokens ${before} → ${after}${passedThrough ? '' : `  (+${growth}${ratio})`}`));
+}
+
 async function commandCompile(args: Args): Promise<number> {
   const raw = readInput(args);
   if (raw.trim().length === 0) {
@@ -133,12 +143,7 @@ async function commandCompile(args: Args): Promise<number> {
   const problems = output.rendered.fidelity.issues.filter((issue) => issue.severity === 'error');
   for (const issue of problems) note(paint.red(`! ${issue.detail}`));
 
-  const before = estimateTokens(raw);
-  const after = estimateTokens(output.rendered.text);
-  const growth = after - before;
-  // A ratio on a ten-token input says nothing; the absolute overhead is the real cost.
-  const ratio = before >= 40 ? `, ${(growth / before).toFixed(1)}×` : '';
-  note(paint.dim(`tokens ${before} → ${after}${output.passedThrough ? '' : `  (+${growth}${ratio})`}`));
+  reportCost(raw, output.rendered.text, output.passedThrough);
 
   emit(output.rendered.text, output.spec, args);
   if (!flagOn(args, 'json') && flagValue(args, 'out') === undefined) {
@@ -336,7 +341,10 @@ function commandContinue(args: Args): number {
   }
 
   const previous = loadSpec();
-  const { spec, notes } = composeContinuation(previous, followUp);
+  const carry = flagValue(args, 'carry') as 'full' | 'minimal' | 'off' | undefined;
+  const { spec, notes } = composeContinuation(previous, followUp, {
+    ...(carry !== undefined ? { carry } : {}),
+  });
 
   const style = flagValue(args, 'style') as StyleName | undefined;
   const keepOriginal = flagValue(args, 'keep-original') as 'auto' | 'on' | 'off' | undefined;
@@ -348,6 +356,7 @@ function commandContinue(args: Args): number {
   for (const entry of notes) note(paint.dim(`· ${entry}`));
   const problems = rendered.fidelity.issues.filter((issue) => issue.severity === 'error');
   for (const issue of problems) note(paint.red(`! ${issue.detail}`));
+  reportCost(followUp, rendered.text);
 
   saveSpec(spec, rendered.text);
   emit(rendered.text, spec, args);
@@ -408,4 +417,5 @@ main(process.argv.slice(2))
     note(paint.red(error instanceof Error ? error.message : String(error)));
     process.exitCode = 1;
   });
+
 

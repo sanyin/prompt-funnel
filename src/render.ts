@@ -203,6 +203,12 @@ function renderChecklist(spec: PromptSpec, labels: Labels): string[] {
 export function shouldKeepOriginal(spec: PromptSpec, mode: 'auto' | 'on' | 'off'): boolean {
   if (mode === 'on') return true;
   if (mode === 'off') return false;
+  // A continuation's source is the whole thread, and it grows every turn. The
+  // carried block already states what was agreed, so re-attaching the transcript
+  // is pure duplication — unless the caller deliberately carried nothing (which
+  // means the host has the history) or there is code that exists nowhere else.
+  if (spec.meta.carry === 'off') return false;
+  if (spec.carried !== undefined) return spec.anchors.length > 0;
   return spec.anchors.length > 0 || spec.assumptions.length > 0 || spec.openQuestions.length > 0;
 }
 

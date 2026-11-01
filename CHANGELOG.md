@@ -1,5 +1,12 @@
 # 变更记录
 
+## 0.2.1
+
+- **跨轮去重**：`continue` 新增 `--carry full|minimal|off`（CLI 默认 full，MCP 默认 minimal）。续接时不再把整段线程作为「原文」重附，长对话的开销从「每轮 +25 tokens」变成基本持平。
+- `evals/cost.mjs` + [docs/COST.md](docs/COST.md)：成本从「倍数」改成报绝对开销；`compile` / `continue` 每次打印实际 tokens。
+- `--budget N`：超出预算自动降级 `compact` + 不附原文，仍然超出会明说。
+- playground 增加「直接发，模型会替你决定这些」面板：内容来自当前输入的 `spec.assumptions`，只在该请求确实会被收束时出现。
+
 ## 0.2.0
 
 新增能力，全部零运行时依赖。
