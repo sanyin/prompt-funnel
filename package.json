@@ -6,7 +6,7 @@
   "bin": {
     "prompt-funnel": "./dist/cli/index.js",
     "funnel": "./dist/cli/index.js",
-    "funnel-mcp": "./dist/mcp/server.js"
+    "funnel-mcp": "./dist/mcp/main.js"
   },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -44,11 +44,11 @@
     "deepseek-harness",
     "cli"
   ],
-  "author": "sanying",
+  "author": "sanyin",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/sanying/prompt-funnel.git"
+    "url": "git+https://github.com/sanyin/prompt-funnel.git"
   },
   "devDependencies": {
     "@types/node": "^22.19.1",
