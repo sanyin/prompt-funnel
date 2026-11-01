@@ -302,6 +302,7 @@ const GAP_OPTIONS: Record<Lang, Record<string, string[]>> = {
     acceptance: ['能跑通 / 通过测试', '覆盖所有要求', '500 字以内', '能直接发给别人'],
     stack: ['沿用现有技术栈', 'TypeScript / Node', 'Python', '不确定，你来选'],
     quality: ['玩法 / 规则上的新', '视觉 / 氛围上的新', '技术实现上的新', '先给我三个方向选'],
+    failure: ['做出来不能用', '能用，但不是我想的样子', '方向对，但太粗糙', '我也说不上来'],
   },
   en: {
     audience: ['A complete beginner', 'Someone with basics', 'A domain expert', 'Someone deciding something'],
@@ -310,6 +311,7 @@ const GAP_OPTIONS: Record<Lang, Record<string, string[]>> = {
     acceptance: ['It runs / tests pass', 'It covers every requirement', 'Under 500 words', 'I can send it to someone'],
     stack: ['The existing stack', 'TypeScript / Node', 'Python', 'Not sure, you pick'],
     quality: ['New mechanics', 'New look and feel', 'New technical approach', 'Give me three directions first'],
+    failure: ['It does not run', 'It runs but is not what I meant', 'Right direction, too rough', 'I cannot say'],
   },
 };
 
@@ -362,6 +364,27 @@ function collectGaps(
       question: content.gaps.scope.question,
       options: GAP_OPTIONS[lang].scope ?? [],
       assumption: { text: content.gaps.scope.assumption, impact: content.gaps.scope.impact },
+    });
+  }
+  if (intent === 'execute' || intent === 'plan' || intent === 'write') {
+    gaps.push({
+      id: 'failure',
+      rank: 2,
+      question:
+        lang === 'zh'
+          ? '什么情况算失败？（你最不想要的结果）'
+          : 'What would count as a failure here?',
+      options: GAP_OPTIONS[lang].failure ?? [],
+      assumption: {
+        text:
+          lang === 'zh'
+            ? '没有失败条件，按这类任务最常见的坑自查'
+            : 'No stated failure mode; check against the usual traps for this kind of task',
+        impact:
+          lang === 'zh'
+            ? '不说清什么算失败，模型不会主动避开它'
+            : 'A failure you never named is one the model will not avoid',
+      },
     });
   }
   if (deliverable.format === undefined) {

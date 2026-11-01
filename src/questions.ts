@@ -42,6 +42,9 @@ function renumber(requirements: Requirement[]): Requirement[] {
   return requirements.map((requirement, index) => ({ ...requirement, id: `R${index + 1}` }));
 }
 
+/** The "no opinion" option: answering it should not invent a criterion. */
+const NO_FAILURE_STATED = /^(?:我也说不上来|I cannot say)$/u;
+
 /** The option that asks the model to propose directions instead of committing. */
 const ASK_FOR_OPTIONS = /^(?:先给我三个方向选|Give me three directions first)$/u;
 
@@ -92,6 +95,11 @@ export function answerQuestion(spec: PromptSpec, id: string, answer: string): Pr
       } else {
         next.constraints.push({ text: `「新意 / 竞争力」的落点：${text}`, source: 'user' });
       }
+      break;
+    case 'failure':
+      // A failure mode is an acceptance criterion in the negative: "this must not
+      // happen". "I cannot say" is a real answer and adds nothing.
+      if (!NO_FAILURE_STATED.test(text)) next.acceptance.push({ text: `不出现：${text}`, source: 'user' });
       break;
     case 'scope':
       // Scope choices narrow the work; they belong with the constraints, not the

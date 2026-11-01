@@ -41,7 +41,13 @@ test('a scope answer lands in constraints, not requirements', () => {
 });
 
 test('the stack answer is labelled so it reads as a constraint', () => {
-  const next = answerQuestion(vague(), 'stack', 'Python');
+  // Earlier gaps are only skipped when the request already answers them; the
+  // question cap then lets the stack through.
+  const spec = analyzeWithRules('把 src/app.ts 的并发改成 8，最后给我一份报告，改完要能通过 pnpm test');
+  const ids = questionsFor(spec).map((question) => question.id);
+  assert.ok(ids.includes('stack'), ids.join(','));
+
+  const next = answerQuestion(spec, 'stack', 'Python');
   assert.ok(next.constraints.some((item) => item.text === '技术栈：Python'));
 });
 
@@ -103,4 +109,29 @@ test('asking for directions becomes a requirement, not a constraint', () => {
 test('a request without hollow praise gets no quality question', () => {
   const spec = analyzeWithRules('把 src/app.ts 的并发从 4 改成 8');
   assert.ok(!questionsFor(spec).some((question) => question.id === 'quality'));
+});
+
+test('a build request is asked what failure looks like', () => {
+  const ids = questionsFor(analyzeWithRules('帮我写个爬虫，顺便加个代理池')).map((q) => q.id);
+  assert.ok(ids.includes('failure'), ids.join(','));
+});
+
+test('a question or a bug report is not asked about failure modes', () => {
+  const answer = questionsFor(analyzeWithRules('这个报错为什么不生效？'));
+  assert.ok(!answer.some((q) => q.id === 'failure'));
+});
+
+test('naming a failure turns it into a negative acceptance criterion', () => {
+  const spec = analyzeWithRules('帮我写个爬虫');
+  const next = answerQuestion(spec, 'failure', '做出来不能用');
+  assert.ok(next.acceptance.some((item) => item.text === '不出现：做出来不能用'));
+  assert.equal(next.acceptance.find((item) => item.text.includes('做出来不能用'))?.source, 'user');
+});
+
+test('"I cannot say" is a real answer and invents nothing', () => {
+  const spec = analyzeWithRules('帮我写个爬虫');
+  const before = spec.acceptance.length;
+  const next = answerQuestion(spec, 'failure', '我也说不上来');
+  assert.equal(next.acceptance.length, before);
+  assert.ok(!questionsFor(next).some((q) => q.id === 'failure'));
 });
