@@ -11,6 +11,8 @@
 
 这个工具在请求进入模型之前插一道闸门：清晰的请求原样放行，模糊的请求被拆成结构化条目，缺的部分不是猜，而是**写成假设并标明「若不符」的后果**。
 
+![playground](docs/assets/playground.png)
+
 ```bash
 $ funnel review "帮我写一个爬虫，同时加上代理池，另外再做一个可视化面板"
 ```
@@ -81,7 +83,7 @@ npx prompt-funnel review  "帮我优化一下这个东西"    # 交互式：改�
 
 零运行时依赖，不需要 API key，离线可用。
 
-## 三个入口，一个内核
+## 四个入口，一个内核
 
 ```
 用户原文 ──▶ 闸门 gate ──pass──▶ 原样发送（字节相同）
@@ -96,7 +98,7 @@ npx prompt-funnel review  "帮我优化一下这个东西"    # 交互式：改�
                 ▼
       保真校验：硬字面量 + 保留率
                 ▼
-      用户评审：同意 / 编辑 / 看差异 / 换排版
+      评审：同意 / 编辑 / 看差异 / refine 单点改
                 ▼
             发送 + 存证
 ```
@@ -105,7 +107,8 @@ npx prompt-funnel review  "帮我优化一下这个东西"    # 交互式：改�
 | --- | --- | --- |
 | CLI | 终端、脚本、管道 | `npx prompt-funnel review "..."` |
 | MCP | 任何 agent（DSH / Codex / Claude Code / Cursor） | `npx -y prompt-funnel mcp` |
-| Skill | 让 agent 自己知道何时该收束 | `node adapters/install.mjs codex` |
+| Hook | Claude Code 发送前自动收束 | `funnel hook`（见 [adapters/claude-code](adapters/claude-code/README.md)） |
+| 网页 | 不装任何东西，先用一眼 | `npm run playground`，或 GitHub Pages |
 
 MCP 只做确定性的事（判定 / 分析 / 校验 / 渲染），**语义工作交给宿主自己的模型**——不需要第二个 key，也不额外花 token。
 
@@ -131,14 +134,17 @@ MCP 只做确定性的事（判定 / 分析 / 校验 / 渲染），**语义工�
 src/
   gate.ts        闸门：六维加权，判定 + 人话理由
   analyze.ts     抽取式分析：只重排不改写
+  refine.ts      单点修改：第 2 点改成 X / 再加一条 / 删掉
   render.ts      三种排版 + provenance 标记
   validate.ts    保真校验 + spec 归一化
+  hook.ts        Claude Code 发送前钩子（advisory / block / off）
   llm.ts         可选 API 引擎（OpenAI 兼容）
-  cli/           compile / review / gate / render / config
+  cli/           compile / review / refine / gate / render / config / hook
   mcp/           stdio MCP server（零依赖实现）
-adapters/        Codex / DSH / Claude Code 的 skill 与安装脚本
-evals/           16 条用例 + 离线评测 + 报告
-docs/            DESIGN（为什么）/ SPEC（数据结构）/ USAGE / EVAL
+playground/      单页 demo：浏览器里直接跑同一份内核
+adapters/        Codex / DSH / Claude Code 的 skill、安装脚本与配置说明
+evals/           16 条离线用例 + 真实模型 A/B harness
+docs/            DESIGN（为什么）/ SPEC（数据结构）/ USAGE / EVAL / EXAMPLE
 ```
 
 ## 已知局限

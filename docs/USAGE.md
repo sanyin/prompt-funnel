@@ -107,11 +107,39 @@ skill 里写清了「什么时候触发、循环怎么走、哪些事不许做�
 ```
 funnel compile "<请求>"     收束并输出提示词
 funnel review  "<请求>"     交互式收束
+funnel refine  "<意见>"     对上一次的 spec 定点改一处，其余不动
 funnel gate    "<请求>"     只看判定，不生成
 funnel render  [spec.json]  从已有 spec 重新渲染
 funnel config  [show|set]   查看 / 修改配置
 funnel mcp                  启动 MCP server
+funnel hook                 Claude Code 钩子入口（读 stdin）
 ```
+
+### 单点修改：`refine`
+
+收束过一次之后，最多余的动作是「第 2 点改成先做爬虫」——重跑分析会把已经谈好的部分全洗牌。`refine` 只改你指的那一处：
+
+```bash
+funnel refine "第 2 点改成先做爬虫骨架"
+funnel refine "第 3 条删掉"
+funnel refine "再加一条：支持断点续传"
+funnel refine "目标改成先跑通最小可用版本"
+funnel refine "限制在 500 字以内"
+funnel refine "别动导出接口"        # 进「不要做」
+funnel refine "..." --dry          # 只看会改什么，不落盘
+```
+
+改完会重跑一次保真校验。**你在意见里新写的数字、路径不算编造**——它们也是你的输入，会被记进 `meta.note` 作为允许来源。
+
+支持的形式列在 `REFINE_FORMS` 里；看不懂时它直接列给你，不会猜。
+
+### 网页版
+
+```bash
+npm run playground     # 构建 site/ 并在 http://127.0.0.1:8080 起服务
+```
+
+页面直接 `import` 编译后的 `dist/` 模块——核心模块不碰 `node:`，所以不需要打包器，也不用联网。同一份代码，不是复制品。
 
 | 参数 | 说明 |
 | --- | --- |
@@ -164,6 +192,22 @@ args = ["-y", "prompt-funnel", "mcp"]
 ```
 
 3. 新会话里输入「帮我把这个需求整理成提示词」。
+
+## 接入 Claude Code
+
+Claude Code 有公开的 `UserPromptSubmit` 钩子，是唯一能在「发送前」真正介入的宿主。
+
+```json
+{
+  "hooks": {
+    "UserPromptSubmit": [
+      { "hooks": [ { "type": "command", "command": "funnel hook", "timeout": 10 } ] }
+    ]
+  }
+}
+```
+
+写进 `~/.claude/settings.json`。默认 `advisory`（只附加结构，不拦人），`--mode block` 才会拦。细节和限制见 [adapters/claude-code](../adapters/claude-code/README.md)。
 
 ## 常见问题
 

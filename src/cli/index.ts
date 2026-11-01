@@ -14,6 +14,7 @@ import { resolve } from 'node:path';
 import { compile } from '../compile.js';
 import { configPath, loadConfig, resolveApiKey, saveConfig } from '../config.js';
 import { gate } from '../gate.js';
+import { applyPatches, REFINE_FORMS, parseRefineNote } from '../refine.js';
 import { renderSpec } from '../render.js';
 import { saveSpec, loadSpec, textPath } from '../store.js';
 import type { PromptSpec, StyleName } from '../types.js';
@@ -28,6 +29,7 @@ const HELP = `${paint.bold('funnel')} — 提示词收束：把模糊的请求�
 ${paint.bold('用法')}
   funnel compile "<原始请求>"        收束并输出提示词（管道友好，诊断走 stderr）
   funnel review  "<原始请求>"        交互式：收束 → 改 → 认可 → 输出
+  funnel refine  "<修改意见>"        对上一次的 spec 定点改一处，其余不动
   funnel gate    "<原始请求>"        只看闸门判定，不生成
   funnel render  <spec.json>         从已有 spec 重新渲染（可换排版）
   funnel config  [show|set k v]      查看/修改配置
@@ -219,6 +221,67 @@ function commandConfig(args: Args): number {
   return 2;
 }
 
+function commandRefine(args: Args): number {
+  const refinement = args.words.join(' ').trim();
+  if (refinement.length === 0) {
+    note(paint.red('用法：funnel refine "<修改意见>"，例如 funnel refine "第 2 点改成先做爬虫"'));
+    for (const form of REFINE_FORMS) note(paint.dim(`  · ${form}`));
+    return 2;
+  }
+
+  const specFile = flagValue(args, 'spec');
+  let spec: PromptSpec | undefined;
+  if (specFile !== undefined) {
+    try {
+      spec = JSON.parse(readFileSync(resolve(specFile), 'utf8')) as PromptSpec;
+    } catch (error) {
+      note(paint.red(`读不了 spec：${error instanceof Error ? error.message : String(error)}`));
+      return 2;
+    }
+  } else {
+    spec = loadSpec();
+  }
+  if (spec === undefined) {
+    note(paint.red('没有可修改的 spec。先跑一次 funnel compile。'));
+    return 2;
+  }
+  if (spec.meta === undefined || typeof spec.meta.source !== 'string') {
+    note(paint.red('spec 缺少 meta.source，无法做保真校验。'));
+    return 2;
+  }
+
+  const patches = parseRefineNote(refinement);
+  if (patches.length === 0) {
+    note(paint.yellow('没看懂这条意见。支持的形式：'));
+    for (const form of REFINE_FORMS) note(paint.dim(`  · ${form}`));
+    return 2;
+  }
+
+  if (flagOn(args, 'dry')) {
+    note(paint.bold('将要应用的改动：'));
+    for (const patch of patches) {
+      note(paint.dim(`  · ${patch.section}/${patch.op}${patch.index === undefined ? '' : ` #${patch.index + 1}`}${patch.text === undefined ? '' : ` → ${patch.text}`}`));
+    }
+    return 0;
+  }
+
+  const { spec: next, applied } = applyPatches(spec, patches);
+  const style = flagValue(args, 'style') as StyleName | undefined;
+  const keepOriginal = flagValue(args, 'keep-original') as 'auto' | 'on' | 'off' | undefined;
+  const rendered = renderSpec(next, {
+    ...(style !== undefined ? { style } : {}),
+    ...(keepOriginal !== undefined ? { keepOriginal } : {}),
+  });
+
+  for (const entry of applied) note(paint.dim(`· ${entry}`));
+  const problems = rendered.fidelity.issues.filter((issue) => issue.severity === 'error');
+  for (const issue of problems) note(paint.red(`! ${issue.detail}`));
+
+  saveSpec(next, rendered.text);
+  emit(rendered.text, next, args);
+  return problems.length > 0 ? 1 : 0;
+}
+
 async function main(argv: string[]): Promise<number> {
   const args = parseArgs(argv);
 
@@ -238,6 +301,8 @@ async function main(argv: string[]): Promise<number> {
       return commandGate(args);
     case 'review':
       return await commandReview(args);
+    case 'refine':
+      return commandRefine(args);
     case 'render':
       return commandRender(args);
     case 'config':
@@ -245,6 +310,11 @@ async function main(argv: string[]): Promise<number> {
     case 'mcp': {
       const { serve } = await import('../mcp/server.js');
       await serve();
+      return 0;
+    }
+    case 'hook': {
+      const { runHookMain } = await import('../hook-run.js');
+      runHookMain(args.words);
       return 0;
     }
     default:
@@ -262,3 +332,4 @@ main(process.argv.slice(2))
     note(paint.red(error instanceof Error ? error.message : String(error)));
     process.exitCode = 1;
   });
+

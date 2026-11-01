@@ -66,6 +66,10 @@ function classify(text: string): Role {
   return estimateTokens(text) > 8 ? 'context' : 'requirement';
 }
 
+/** A comma followed by one of these starts a new requirement. */
+const JUNCTION =
+  /[，,]\s*(?:(?:并且|同时|另外|还要|顺便|以及|然后)|再(?=[做加写改实现补生成跑试]))/u;
+
 /** Comma that introduces a prohibition starts a new unit. */
 const NEGATION_LEAD = /[，,]\s*(?=(?:不要|别|无需|不需要|禁止|不得|不考虑|不允许))/u;
 
@@ -73,9 +77,7 @@ const NEGATION_LEAD = /[，,]\s*(?=(?:不要|别|无需|不需要|禁止|不得|
 function segment(block: string): string[] {
   const bySemicolon = block.split(/[；;]/u);
   const byNegation = bySemicolon.flatMap((part) => part.split(NEGATION_LEAD));
-  return byNegation.flatMap((part) =>
-    hasJunction(part) ? part.split(/[，,]\s*(?:并且|同时|另外|还要|以及|然后)/u) : [part],
-  );
+  return byNegation.flatMap((part) => (JUNCTION.test(part) ? part.split(JUNCTION) : [part]));
 }
 
 /** Split one block into units, keeping list items whole. */
@@ -89,10 +91,6 @@ function splitUnits(block: string, fromList: boolean): Unit[] {
     }
   }
   return units;
-}
-
-function hasJunction(text: string): boolean {
-  return /[，,]\s*(?:并且|同时|另外|还要|以及|然后)/u.test(text);
 }
 
 /** Collect fenced code and quoted spans; both must survive verbatim. */

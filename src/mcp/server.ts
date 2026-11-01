@@ -19,7 +19,9 @@ import { createInterface } from 'node:readline';
 import { analyze, compile } from '../compile.js';
 import { loadConfig } from '../config.js';
 import { gate } from '../gate.js';
+import { applyPatches, REFINE_FORMS, parseRefineNote } from '../refine.js';
 import { renderSpec } from '../render.js';
+import { loadSpec } from '../store.js';
 import { coerceSpec, validateSpec } from '../validate.js';
 import type { PromptSpec, StyleName } from '../types.js';
 import { VERSION } from '../version.js';
@@ -91,6 +93,25 @@ const TOOLS: ToolDefinition[] = [
         },
       },
       required: ['spec'],
+    },
+  },
+  {
+    name: 'funnel_refine',
+    description:
+      'Apply one targeted change to an existing PromptSpec instead of re-analysing the request: ' +
+      '"make point 2 shorter", "第 2 条删掉", "再加一条：…". Only the named section changes; everything already agreed on is preserved. ' +
+      'Returns the rendered prompt plus a line per change. ' +
+      'Use this for follow-ups after a spec exists — never re-run funnel_analyze for a small edit.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        note: { type: 'string', description: 'The refinement, e.g. "第 2 点改成先做爬虫".' },
+        spec: { type: 'object', description: 'Spec to refine. Omit to use the most recent one on disk.' },
+        source: { type: 'string', description: "Original request, required when `spec` lacks meta.source." },
+        style: { type: 'string', enum: STYLE_ENUM },
+        keepOriginal: { type: 'string', enum: ['auto', 'on', 'off'] },
+      },
+      required: ['note'],
     },
   },
   {
@@ -201,6 +222,54 @@ async function callTool(name: string, args: unknown): Promise<string> {
         ...problems.map((issue) => `- ${issue.severity === 'error' ? '错误' : '提示'}：${issue.detail}`),
         '',
         '若校验报了未溯源字面量，先问用户那些数字/路径是否正确，再发送。',
+      ].join('\n');
+    }
+    case 'funnel_refine': {
+      const record = typeof args === 'object' && args !== null ? (args as Record<string, unknown>) : {};
+      const refinement = typeof record['note'] === 'string' ? record['note'].trim() : '';
+      if (refinement.length === 0) throw new Error('note 不能为空');
+
+      const source = typeof record['source'] === 'string' ? record['source'] : '';
+      const given = record['spec'];
+      let spec: PromptSpec | undefined;
+
+      if (typeof given === 'object' && given !== null) {
+        const base = source.trim().length > 0 ? analyze(source) : loadSpec();
+        if (base === undefined) throw new Error('缺少 source：spec 里没有 meta.source 时必须传 source');
+        spec = coerceSpec(given, base);
+      } else {
+        spec = loadSpec();
+        if (spec === undefined) throw new Error('没有可修改的 spec：先调用 funnel_analyze，或直接传 spec');
+      }
+
+      if (typeof spec.meta.source !== 'string') {
+        throw new Error('spec 缺少 meta.source，无法做保真校验');
+      }
+
+      const patches = parseRefineNote(refinement);
+      if (patches.length === 0) {
+        return ['没看懂这条意见。支持的形式：', ...REFINE_FORMS.map((form) => `- ${form}`)].join('\n');
+      }
+
+      const { spec: next, applied } = applyPatches(spec, patches);
+      const style = styleOf(record['style']);
+      const keepOriginal = keepOf(record['keepOriginal']);
+      const rendered = renderSpec(next, {
+        ...(style !== undefined ? { style } : {}),
+        ...(keepOriginal !== undefined ? { keepOriginal } : {}),
+      });
+
+      return [
+        '## prompt（本轮发给模型的内容）',
+        '```markdown',
+        rendered.text.trimEnd(),
+        '```',
+        '',
+        '## 改了什么',
+        ...applied.map((entry) => `- ${entry}`),
+        '',
+        `保真：原文保留 ${(rendered.fidelity.retention * 100).toFixed(0)}%　${rendered.fidelity.ok ? '通过' : '有错误'}`,
+        ...rendered.fidelity.issues.map((issue) => `- ${issue.severity === 'error' ? '错误' : '提示'}：${issue.detail}`),
       ].join('\n');
     }
     case 'funnel_compile': {

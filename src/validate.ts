@@ -43,12 +43,14 @@ function issue(kind: Issue['kind'], detail: string, severity: Issue['severity'])
  */
 export function checkFidelity(spec: PromptSpec, body: string): FidelityReport {
   const source = spec.meta.source;
-  const sourceLower = source.toLowerCase();
+  // A refinement note is user input too: literals the user typed while editing
+  // are not inventions, so they are allowed against the recorded notes as well.
+  const allowed = `${source}\n${spec.meta.note ?? ''}`.toLowerCase();
   const issues: Issue[] = [];
 
   const unverifiable: string[] = [];
   for (const token of extractHardTokens(body)) {
-    if (sourceLower.includes(token.value.toLowerCase())) continue;
+    if (allowed.includes(token.value.toLowerCase())) continue;
     unverifiable.push(token.value);
     if (token.kind === 'number' || token.kind === 'url' || token.kind === 'path') {
       issues.push(issue('unverifiable-token', `输出里的「${token.value}」在原文中找不到`, 'error'));

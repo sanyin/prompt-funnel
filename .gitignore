@@ -1,6 +1,8 @@
 node_modules/
 dist/
 .funnel/
+site/
+evals/live/
 *.log
 .DS_Store
 Thumbs.db

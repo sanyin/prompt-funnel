@@ -6,7 +6,8 @@
   "bin": {
     "prompt-funnel": "./dist/cli/index.js",
     "funnel": "./dist/cli/index.js",
-    "funnel-mcp": "./dist/mcp/main.js"
+    "funnel-mcp": "./dist/mcp/main.js",
+    "funnel-hook": "./dist/hook-main.js"
   },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -19,6 +20,8 @@
   "files": [
     "dist",
     "adapters",
+    "playground",
+    "scripts",
     "docs",
     "README.md",
     "LICENSE"
@@ -30,6 +33,8 @@
     "build": "tsc -p tsconfig.json",
     "test": "npm run build && node --test \"test/*.test.mjs\"",
     "eval": "npm run build && node evals/run.mjs",
+    "eval:live": "npm run build && node evals/live.mjs",
+    "playground": "npm run build && node scripts/playground.mjs",
     "prepublishOnly": "npm run build"
   },
   "keywords": [

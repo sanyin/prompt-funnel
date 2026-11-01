@@ -20,6 +20,8 @@ export type { CompileDeps } from './compile.js';
 export { gate, COMPILE_THRESHOLD } from './gate.js';
 export { analyzeWithRules } from './analyze.js';
 export { renderSpec, shouldKeepOriginal } from './render.js';
+export { applyPatches, parseRefineNote, REFINE_FORMS } from './refine.js';
+export type { Patch, RefineResult, Section } from './refine.js';
 export { checkFidelity, coerceSpec, validateSpec, MAX_REQUIREMENTS, MIN_RETENTION } from './validate.js';
 export { diffLines, formatDiff } from './diff.js';
 export type { DiffLine } from './diff.js';

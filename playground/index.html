@@ -1,0 +1,263 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>prompt-funnel · 收束</title>
+    <style>
+      :root {
+        --bg: #fbfbfa;
+        --panel: #ffffff;
+        --ink: #1b1b19;
+        --muted: #6b6b66;
+        --line: #e4e4df;
+        --accent: #2f6f4f;
+        --warn: #9a6b12;
+        --bad: #a33a2c;
+        --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #16161a;
+          --panel: #1d1d22;
+          --ink: #e8e8e4;
+          --muted: #9a9a94;
+          --line: #2e2e35;
+          --accent: #7fbf9a;
+          --warn: #d8b465;
+          --bad: #e08b7c;
+        }
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        padding: 24px;
+        background: var(--bg);
+        color: var(--ink);
+        font: 15px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      }
+      header { max-width: 1180px; margin: 0 auto 20px; }
+      h1 { font-size: 20px; margin: 0 0 6px; letter-spacing: -0.01em; }
+      .sub { color: var(--muted); font-size: 13px; }
+      .sub a { color: inherit; }
+      main {
+        max-width: 1180px;
+        margin: 0 auto;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr);
+        gap: 18px;
+        align-items: start;
+      }
+      @media (max-width: 900px) { main { grid-template-columns: 1fr; } }
+      section {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 16px;
+      }
+      label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 8px; letter-spacing: 0.04em; }
+      textarea {
+        width: 100%;
+        min-height: 150px;
+        resize: vertical;
+        padding: 12px;
+        border-radius: 8px;
+        border: 1px solid var(--line);
+        background: var(--bg);
+        color: var(--ink);
+        font: inherit;
+      }
+      textarea:focus, select:focus, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+      .row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; align-items: center; }
+      button, select {
+        font: inherit;
+        font-size: 13px;
+        padding: 6px 12px;
+        border-radius: 7px;
+        border: 1px solid var(--line);
+        background: var(--bg);
+        color: var(--ink);
+        cursor: pointer;
+      }
+      button:hover { border-color: var(--accent); }
+      button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+      @media (prefers-color-scheme: dark) { button.primary { color: #10120f; } }
+      .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+      .chip { font-size: 12px; padding: 4px 10px; border-radius: 999px; border: 1px dashed var(--line); background: transparent; color: var(--muted); cursor: pointer; }
+      .chip:hover { color: var(--ink); border-color: var(--accent); }
+      .verdict { display: flex; align-items: baseline; gap: 10px; margin-bottom: 4px; }
+      .badge { font-family: var(--mono); font-size: 12px; padding: 2px 8px; border-radius: 6px; }
+      .badge.pass { background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--accent); }
+      .badge.compile { background: color-mix(in srgb, var(--warn) 20%, transparent); color: var(--warn); }
+      .score { font-family: var(--mono); color: var(--muted); font-size: 12px; }
+      .axes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px 12px; margin: 12px 0 4px; }
+      .axis { font-size: 11px; color: var(--muted); }
+      .bar { height: 4px; border-radius: 2px; background: var(--line); margin-top: 3px; overflow: hidden; }
+      .bar > i { display: block; height: 100%; background: var(--accent); }
+      .reasons { margin: 10px 0 0; padding-left: 16px; color: var(--muted); font-size: 12.5px; }
+      pre {
+        margin: 0;
+        padding: 14px;
+        border-radius: 8px;
+        border: 1px solid var(--line);
+        background: var(--bg);
+        font-family: var(--mono);
+        font-size: 12.5px;
+        line-height: 1.55;
+        white-space: pre-wrap;
+        word-break: break-word;
+        max-height: 46vh;
+        overflow: auto;
+      }
+      .meta { margin-top: 10px; font-size: 12px; color: var(--muted); font-family: var(--mono); }
+      .meta .bad { color: var(--bad); }
+      footer { max-width: 1180px; margin: 22px auto 0; color: var(--muted); font-size: 12px; }
+      .empty { color: var(--muted); font-size: 13px; padding: 20px 0; text-align: center; }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>prompt-funnel · 收束</h1>
+      <div class="sub">
+        在请求进入模型之前，把缺失的信息显式化。全部在这个页面里跑，不发任何网络请求。
+        <a href="https://github.com/sanyin/prompt-funnel">源码</a>
+      </div>
+    </header>
+
+    <main>
+      <section>
+        <label for="input">你的原始请求</label>
+        <textarea id="input" spellcheck="false" placeholder="例如：帮我优化一下这个东西"></textarea>
+        <div class="chips" id="samples"></div>
+        <div class="row">
+          <select id="style" aria-label="排版">
+            <option value="bluf">分节（默认）</option>
+            <option value="compact">紧凑</option>
+            <option value="checklist">勾选清单</option>
+          </select>
+          <button id="copy">复制结果</button>
+        </div>
+        <div id="gate"></div>
+      </section>
+
+      <section>
+        <label>收束结果</label>
+        <pre id="out" aria-live="polite"></pre>
+        <div class="meta" id="fidelity"></div>
+      </section>
+    </main>
+
+    <footer>
+      闸门判定与收束都在本地完成；同一份内核也跑在 CLI 和 MCP server 里。
+    </footer>
+
+    <script type="module">
+      import { gate } from './dist/gate.js';
+      import { analyzeWithRules } from './dist/analyze.js';
+      import { renderSpec } from './dist/render.js';
+
+      const input = document.getElementById('input');
+      const gateBox = document.getElementById('gate');
+      const out = document.getElementById('out');
+      const meta = document.getElementById('fidelity');
+      const style = document.getElementById('style');
+
+      const AXIS_LABEL = {
+        goal: '目标',
+        deliverable: '交付',
+        context: '背景',
+        constraints: '约束',
+        acceptance: '验收',
+        risk: '风险',
+      };
+
+      const SAMPLES = [
+        '帮我优化一下这个东西',
+        '帮我写个爬虫，顺便加个代理池，再做个面板',
+        '1. 支持断点续传\n2. 失败重试 3 次\n3. 导出 CSV',
+        'make it better',
+        '这段代码为什么报 TypeError: x is not a function？',
+      ];
+
+      const samples = document.getElementById('samples');
+      for (const sample of SAMPLES) {
+        const chip = document.createElement('button');
+        chip.className = 'chip';
+        chip.textContent = sample.replace(/\n/g, ' / ').slice(0, 22) + (sample.length > 22 ? '…' : '');
+        chip.addEventListener('click', () => {
+          input.value = sample;
+          render();
+        });
+        samples.append(chip);
+      }
+
+      let timer;
+      const schedule = () => {
+        clearTimeout(timer);
+        timer = setTimeout(render, 120);
+      };
+
+      function renderGate(verdict) {
+        const rows = Object.entries(verdict.axes)
+          .map(
+            ([key, value]) =>
+              `<div class="axis">${AXIS_LABEL[key] ?? key} ${value.toFixed(2)}<div class="bar"><i style="width:${Math.round(value * 100)}%"></i></div></div>`,
+          )
+          .join('');
+        const reasons = verdict.reasons.map((reason) => `<li>${escapeHtml(reason)}</li>`).join('');
+        gateBox.innerHTML = `
+          <div class="verdict">
+            <span class="badge ${verdict.decision}">${verdict.decision === 'pass' ? '放行' : '收束'}</span>
+            <span class="score">清晰度 ${verdict.score.toFixed(2)} · 意图 ${verdict.signals.intent} · ${verdict.signals.tokens} tokens</span>
+          </div>
+          <div class="axes">${rows}</div>
+          <ul class="reasons">${reasons}</ul>`;
+      }
+
+      function escapeHtml(value) {
+        return String(value).replace(/[&<>"]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[char]);
+      }
+
+      function render() {
+        const text = input.value.trim();
+        if (text.length === 0) {
+          gateBox.innerHTML = '<div class="empty">输入一句话试试</div>';
+          out.textContent = '';
+          meta.textContent = '';
+          return;
+        }
+
+        const verdict = gate(text);
+        renderGate(verdict);
+
+        const spec = analyzeWithRules(text, verdict);
+        const rendered = renderSpec(spec, { style: style.value });
+        out.textContent = rendered.text.trimEnd();
+
+        const errors = rendered.fidelity.issues.filter((issue) => issue.severity === 'error');
+        const retention = (rendered.fidelity.retention * 100).toFixed(0);
+        meta.innerHTML = `保真 ${retention}% · 未溯源 ${rendered.fidelity.unverifiable.length} · ` +
+          (errors.length > 0
+            ? `<span class="bad">${errors.length} 个错误</span>`
+            : `<span>校验通过</span>`);
+      }
+
+      input.addEventListener('input', schedule);
+      style.addEventListener('change', render);
+
+      document.getElementById('copy').addEventListener('click', async () => {
+        try {
+          await navigator.clipboard.writeText(out.textContent ?? '');
+        } catch {
+          const range = document.createRange();
+          range.selectNodeContents(out);
+          const selection = window.getSelection();
+          selection.removeAllRanges();
+          selection.addRange(range);
+        }
+      });
+
+      render();
+    </script>
+  </body>
+</html>
