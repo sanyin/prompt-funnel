@@ -1,9 +1,11 @@
 name: pages
 
 on:
-  # Manual until Pages is switched on for this repository
-  # (Settings → Pages → Source: GitHub Actions). Add `push: branches: [main]`
-  # once it is; a failed deploy on main would otherwise be permanent noise.
+  # Pages is now enabled for this repository (Settings → Pages → GitHub Actions),
+  # so every push redeploys. It was manual-only until the first successful run,
+  # to avoid a permanent red cross on a repository with no Pages source.
+  push:
+    branches: [main]
   workflow_dispatch:
 
 permissions:

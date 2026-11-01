@@ -34,7 +34,9 @@ npx prompt-funnel gate   "make it better"     # verdict only, change nothing
 
 Zero runtime dependencies. No API key required. Works offline. Node ≥ 22.
 
-## Five ways in
+Nothing to install: **https://sanyin.github.io/prompt-funnel/** (redeployed on every push; hard-refresh with Ctrl+Shift+R if your browser shows an old build).
+
+## Six ways in
 
 | Entry point | For | How |
 | --- | --- | --- |
@@ -43,6 +45,7 @@ Zero runtime dependencies. No API key required. Works offline. Node ≥ 22.
 | **Hook** | automatic gating inside Claude Code | `funnel hook` ([setup](./adapters/claude-code/README.md)) |
 | **Skill** | teaching an agent when to use it | `node adapters/install.mjs codex` |
 | **Web** | try it without installing anything | `npm run playground` |
+| **Extension** | fill in the gap inside ChatGPT / Claude / DeepSeek | `npm run build:extension` ([setup](./extension/README.md)) |
 
 The MCP server only does deterministic work (gate / analyze / validate / render); **the semantic step is done by the host's own model**, so there is no second API key and no extra token spend. Six tools:
 
@@ -64,6 +67,16 @@ The MCP server only does deterministic work (gate / analyze / validate / render)
 | Marks guesses as assumptions, asks at most 3 questions | Make you fill in a form |
 | Checks every literal in the output against the source | Trade your exact words for "better phrasing" |
 | Carries agreed context into follow-ups | Guess what "continue" meant |
+
+## See what you are about to send
+
+The most common leak is not an attack, it is a paste: a log with `sk-...` still in it, a stack trace with `C:\Users\...`, an error message with a phone number.
+
+All four surfaces scan for API keys, tokens, private keys, passwords, emails, phone numbers, ID numbers, internal IPs and local paths. When something matches it reports **how many, what kind, how long** — it never prints the secret itself (terminal history is an attack surface too), and never edits your text on its own.
+
+You decide: a per-item "打码" button on the web and in the extension, `--redact` on the CLI, `--no-redact` to skip the scan.
+
+Patterns are deliberately narrow: ports, versions, dates, short commit hashes and order numbers are asserted as non-findings. Missing one is better than being the tool that cried wolf.
 
 ## Four design decisions
 
@@ -120,7 +133,9 @@ raw text ──▶ gate ──pass──▶ sent unchanged (byte-identical)
 ```
 src/
   gate.ts        six-axis clarity score with human-readable reasons
-  analyze.ts     extractive analysis: reorders and flags, never rewrites
+  analyze.ts     extractive analysis: reorders and flags, never rewrites; gaps carry options
+  questions.ts   gaps as clickable questions; answers fold into the right field
+  redact.ts      secret/PII scan: keys, phones, internal IPs, local paths
   refine.ts      single-section edits
   session.ts     follow-up continuation
   templates.ts   intent templates supplying the missing done-state
@@ -130,7 +145,8 @@ src/
   llm.ts         optional API engine (OpenAI-compatible)
   cli/           compile / review / refine / continue / gate / render / templates / config / hook
   mcp/           zero-dependency stdio MCP server, six tools
-playground/      one static page running the same core in the browser
+playground/      one static page: paste, answer, copy
+  extension/       Chromium MV3, imports dist/ directly, requests no permissions
 adapters/        skills and setup notes for Codex / DSH / Claude Code
 evals/           16-case offline suite + live A/B harness
 docs/            DESIGN / SPEC / USAGE / EVAL / AB-REPORT / EXAMPLE
@@ -144,6 +160,8 @@ docs/            DESIGN / SPEC / USAGE / EVAL / AB-REPORT / EXAMPLE
 - Continuation is concatenation plus summarisation, not real dialogue understanding; after several turns the "already agreed" block grows and needs trimming.
 - The Claude Code hook is provably invoked (a probe captured the real `UserPromptSubmit` payload), and `funnel hook` itself is unit-tested and answers in milliseconds; **whether the model adopts the injected structure is not measured** — that is up to the model.
 - The live A/B covers one model, 10 cases, 3 samples; the quality dimension still needs human blind rating.
+- **Secret detection is regex-based**: it catches common formats (sk-, ghp_, JWT, phone numbers, internal IPs) and nothing bespoke. It prefers missing a value to raising a false alarm — a user trained to dismiss warnings is worse off than one who missed a single leak.
+- **The extension was only verified against a local fixture page**, never against the live sites; its composer heuristic depends on page structure and may break when a site changes (the failure mode is an unresponsive button, not a broken page).
 
 ## Contributing
 

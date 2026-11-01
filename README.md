@@ -35,6 +35,8 @@ npx prompt-funnel gate   "帮我优化一下这个东西"    # 只看判定，�
 
 零运行时依赖，不需要 API key，离线可用。Node ≥ 22。
 
+不想装任何东西：**https://sanyin.github.io/prompt-funnel/**（每次 push 自动部署，Pages 若显示旧版请 Ctrl+Shift+R 强刷）。
+
 ## 六种用法
 
 | 入口 | 适合 | 怎么用 |
@@ -72,6 +74,16 @@ MCP 只做确定性的事（判定 / 分析 / 校验 / 渲染），**语义工�
 | 扫出要发出去的密钥、手机号、内网地址 | **不替你改字**：打不打码你决定 |
 | 追问时带上已确认的上下文 | 不猜「继续」是什么意思 |
 
+## 发送前，先看清要发出去的是什么
+
+普通人最常见的泄露不是黑客攻击，是**粘贴**：把带 `sk-...` 的日志、带手机号的报错、带 `C:\Users\...` 的堆栈直接发了出去。
+
+四个入口都会扫一遍：API 密钥 / 令牌 / 私钥 / 密码 / 邮箱 / 手机号 / 身份证号 / 内网地址 / 本机路径。命中就告诉你**几处、什么类型、多长**——但**不会把密钥本身打印出来**（终端历史也是泄露面），也**不会自作主张改你的字**。
+
+要不要打码由你决定：网页上是逐条「打码」按钮，只改命中那一处；CLI 是 `--redact`；不想扫就 `--no-redact`。
+
+规则写得保守：端口、版本号、日期、commit 短哈希、订单号都不会误报，测试里有反例断言。宁可漏一个，也不当那个喊狼来了的人。
+
 ## 四个设计决定
 
 **1. 闸门，不是网关。** 大部分消息本来就清楚，逐条重写要付延迟、token 和信任三重代价。清晰的请求原样放行——字节相同，有测试断言。
@@ -87,24 +99,24 @@ MCP 只做确定性的事（判定 / 分析 / 校验 / 渲染），**语义工�
 ## 工作方式
 
 ```
-用户原文 ──▶ 闸门 gate ──pass──▶ 原样发送（字节相同）
-                │
-              compile
-                ▼
-      结构化为 PromptSpec（每条带来源）
-        rules：抽取式，离线，默认
-        api  ：可选，语义级改写，输出仍要过校验
-                ▼
-      + 模板（code-review / debug / data-analysis / …）
-      + 上一轮已确认（追问时）
-                ▼
-      渲染 bluf / compact / checklist
-                ▼
-      保真校验：硬字面量 + 保留率
-                ▼
-      评审：同意 / 编辑 / 看差异 / refine 单点改
-                ▼
-            发送 + 存证
+用户原文 ──▶ 敏感信息扫描 ──▶ 闸门 gate ──pass──▶ 原样发送（字节相同）
+                │                  │
+          命中就报，不自动改     compile
+                │                  ▼
+                │        结构化为 PromptSpec（每条带来源）
+                │          rules：抽取式，离线，默认
+                │          api  ：可选，语义改写，仍要过校验
+                │                  ▼
+                │          + 模板（code-review / debug / …）
+                │          + 上一轮已确认（追问时）
+                │                  ▼
+                │          渲染 bluf / compact / checklist
+                │                  ▼
+                │          保真校验：硬字面量 + 保留率
+                ▼                  ▼
+         逐条「打码」       评审：点答问题 / 编辑 / 看差异
+                                   ▼
+                              发送 + 存证
 ```
 
 ## 实测
@@ -127,7 +139,9 @@ MCP 只做确定性的事（判定 / 分析 / 校验 / 渲染），**语义工�
 ```
 src/
   gate.ts        闸门：六维加权，判定 + 人话理由
-  analyze.ts     抽取式分析：只重排不改写
+  analyze.ts     抽取式分析：只重排不改写；缺口带 id/问题/选项
+  questions.ts   把缺口变成可点选的问题，答案写回对应字段
+  redact.ts      敏感信息扫描：密钥 / 手机号 / 内网地址 / 本机路径
   refine.ts      单点修改：第 2 点改成 X / 再加一条 / 删掉
   session.ts     追问续接：把已确认的一轮带进下一轮
   templates.ts   意图模板：为特定任务补上缺的验收标准
@@ -137,10 +151,11 @@ src/
   llm.ts         可选 API 引擎（OpenAI 兼容）
   cli/           compile / review / refine / continue / gate / render / templates / config / hook
   mcp/           stdio MCP server（零依赖实现，6 个工具）
-playground/      单页 demo：浏览器里直接跑同一份内核
+playground/      单页问答器：浏览器里直接跑同一份内核
+extension/       Chromium MV3 扩展：从 dist/ 直接 import 内核，无权限申请
 adapters/        Codex / DSH / Claude Code 的 skill、安装脚本与配置说明
-evals/           16 条离线用例 + 真实模型 A/B harness
-docs/            DESIGN / SPEC / USAGE / EVAL / AB-REPORT / EXAMPLE
+evals/           16 条离线用例 + 真实模型 A/B harness + 成本测量
+docs/            DESIGN / SPEC / USAGE / EVAL / AB-REPORT / COST / EXAMPLE
 ```
 
 ## 已知局限
@@ -151,6 +166,8 @@ docs/            DESIGN / SPEC / USAGE / EVAL / AB-REPORT / EXAMPLE
 - 追问续接是「拼接 + 摘要」，不做真正的对话理解；超过几轮后 `已确认` 块会变长，需要手动精简。
 - Hook 装在 Claude Code 上：已用探针确认 Claude Code 会以正确 payload 调用 `UserPromptSubmit`，`funnel hook` 本身有单测且响应在毫秒级；**但「注入的内容是否被模型采用」没有量化验证**，依赖模型本身。
 - 真实 A/B 只测了一个模型、10 个用例、3 次采样，且质量维度尚未人工盲评。
+- **敏感信息靠正则**：能抓常见格式（`sk-` / `ghp_` / JWT / 手机号 / 内网 IP…），抓不到你们内部自定义的密钥格式。宁可漏报也不误报——被假警报训练出来的「无脑点忽略」比漏一个更危险。
+- **浏览器扩展只在本地假页面验证过**（`extension/test/fixture.html`），没在真实站点上验证；「找输入框」依赖页面结构，站点改版可能失效（失效表现是按钮没反应，不会破坏页面）。
 
 ## 参与
 
