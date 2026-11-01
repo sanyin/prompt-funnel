@@ -15,17 +15,30 @@ export interface Args {
   flags: Map<string, string | true>;
 }
 
-/** Parse `funnel <command> [words...] [--flag[=value]]`. */
+/**
+ * Parse `funnel [command] [words...] [--flag[=value]]`.
+ *
+ * Flags may appear before the command (`funnel --help`), which a naive
+ * "argv[0] is the command" parser gets wrong by treating `--help` as a command.
+ */
 export function parseArgs(argv: string[]): Args {
-  const command = argv[0] ?? 'help';
+  let command = '';
   const words: string[] = [];
   const flags = new Map<string, string | true>();
 
-  for (let index = 1; index < argv.length; index += 1) {
+  for (let index = 0; index < argv.length; index += 1) {
     const token = argv[index] as string;
     if (token === '--') {
       words.push(...argv.slice(index + 1));
       break;
+    }
+    if (token === '-h') {
+      flags.set('help', true);
+      continue;
+    }
+    if (token === '-v') {
+      flags.set('version', true);
+      continue;
     }
     if (token.startsWith('--')) {
       const body = token.slice(2);
@@ -43,16 +56,13 @@ export function parseArgs(argv: string[]): Args {
       flags.set(body, true);
       continue;
     }
-    if (token === '-h') {
-      flags.set('help', true);
-      continue;
-    }
-    if (token === '-v') {
-      flags.set('version', true);
+    if (command === '') {
+      command = token;
       continue;
     }
     words.push(token);
   }
+
   return { command, words, flags };
 }
 

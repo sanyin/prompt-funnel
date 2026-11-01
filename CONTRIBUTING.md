@@ -15,7 +15,7 @@
 ```bash
 npm install
 npm run build        # tsc → dist/
-npm test             # 39 条单测（先 build）
+npm test             # 51 条单测（先 build）
 npm run eval         # 16 条离线用例
 ```
 
