@@ -1,0 +1,57 @@
+{
+  "name": "prompt-funnel",
+  "version": "0.1.0",
+  "description": "A convergence gate for AI agents: turn a vague request into a precise, auditable prompt before it reaches the model.",
+  "type": "module",
+  "bin": {
+    "prompt-funnel": "./dist/cli/index.js",
+    "funnel": "./dist/cli/index.js",
+    "funnel-mcp": "./dist/mcp/server.js"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "adapters",
+    "docs",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=20.11"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "npm run build && node --test \"test/*.test.mjs\"",
+    "eval": "npm run build && node evals/run.mjs",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "prompt",
+    "prompt-engineering",
+    "prompt-compiler",
+    "context-engineering",
+    "llm",
+    "mcp",
+    "agent",
+    "codex",
+    "deepseek-harness",
+    "cli"
+  ],
+  "author": "sanying",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sanying/prompt-funnel.git"
+  },
+  "devDependencies": {
+    "@types/node": "^22.19.1",
+    "typescript": "^5.9.3"
+  }
+}

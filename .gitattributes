@@ -1,0 +1,5 @@
+# Keep the repository byte-identical across platforms; the tool reads user text
+# verbatim, so line endings changing underneath it is a real (if small) hazard.
+* text=auto eol=lf
+*.png binary
+*.tgz binary
