@@ -95,6 +95,13 @@
       }
       .q-options button:hover { border-color: var(--accent); color: var(--accent); }
       .q-foot { margin-top: 9px; font-size: 11.5px; color: var(--muted); }
+      .seeds { margin-top: 12px; display: grid; gap: 8px; }
+      .seeds-note { font-size: 11.5px; color: var(--muted); margin: 14px 0 0; }
+      .seed { text-align: left; width: 100%; border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; background: var(--bg); cursor: pointer; font: inherit; color: inherit; }
+      .seed:hover { border-color: var(--accent); }
+      .seed.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, transparent); }
+      .seed b { display: block; font-size: 13px; margin-bottom: 4px; font-weight: 600; }
+      .seed span { font-size: 12px; color: var(--muted); line-height: 1.55; }
       .answers { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
       .answer {
         display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px;
@@ -154,6 +161,7 @@
         </div>
         <div class="answers" id="answers"></div>
         <div class="questions" id="questions"></div>
+        <div class="seeds" id="seeds"></div>
 
         <details class="advanced">
           <summary>高级</summary>
@@ -206,6 +214,7 @@
       import { applyTemplate, getTemplate } from './dist/templates.js';
       import { answerQuestion, questionsFor } from './dist/questions.js';
       import { describe as describeSecret, redactOne, scanSecrets } from './dist/redact.js';
+      import { seedsFor } from './dist/seeds.js';
 
       const input = document.getElementById('input');
       const statusEl = document.getElementById('status');
@@ -221,6 +230,9 @@
 
       /** Chosen answers, keyed by gap id. Re-applied on every keystroke. */
       const answers = new Map();
+      /** A direction from the hand-written library, if the user picked one. */
+      let pickedSeed = null;
+      const ASK_FOR_OPTIONS = '先给我三个方向选';
 
       const AXIS_LABEL = {
         goal: '目标',
@@ -328,6 +340,35 @@
         });
       }
 
+      /** Offer the hand-written shelf when the user asks for directions. */
+      function renderSeeds(text) {
+        const box = document.getElementById('seeds');
+        if (answers.get('quality') !== ASK_FOR_OPTIONS) {
+          pickedSeed = null;
+          box.innerHTML = '';
+          return;
+        }
+        const seeds = seedsFor(text);
+        box.innerHTML =
+          '<p class="seeds-note">或者从方向库里挑一个（手写，不是 AI 生成的；选中才会进提示词）</p>' +
+          seeds
+            .map(
+              (seed, index) =>
+                `<button class="seed${pickedSeed?.id === seed.id ? ' on' : ''}" data-index="${index}">
+                   <b>${escapeHtml(seed.title)}</b>
+                   <span>${escapeHtml(seed.why)}</span>
+                 </button>`,
+            )
+            .join('');
+        box.querySelectorAll('button[data-index]').forEach((button) => {
+          button.addEventListener('click', () => {
+            const seed = seeds[Number(button.dataset.index)];
+            pickedSeed = pickedSeed?.id === seed.id ? null : seed;
+            render();
+          });
+        });
+      }
+
       function render() {
         const text = input.value.trim();
         answersEl.innerHTML = '';
@@ -352,8 +393,20 @@
         let spec = base;
         for (const [id, value] of answers) spec = answerQuestion(spec, id, value);
 
+        renderSeeds(text);
+
         const chosen = getTemplate(templateSel.value);
         if (chosen.id !== 'default') spec = applyTemplate(spec, chosen);
+
+        // A picked direction replaces "ask the model for directions": the user
+        // already chose, so the prompt carries the choice instead of a request.
+        if (pickedSeed !== null && verdict.decision !== 'pass') {
+          spec = {
+            ...spec,
+            requirements: spec.requirements.filter((item) => !item.text.includes('先给 3 个方向')),
+            constraints: [...spec.constraints, { text: `方向参考：${pickedSeed.title}`, source: 'user' }],
+          };
+        }
 
         const questions = verdict.decision === 'pass' ? [] : questionsFor(spec);
         const remaining = new Set(questions.map((question) => question.id));

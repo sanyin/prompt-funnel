@@ -17,6 +17,8 @@ import { gate } from '../gate.js';
 import { applyPatches, REFINE_FORMS, parseRefineNote } from '../refine.js';
 import { describe as describeSecret } from '../redact.js';
 import { renderSpec } from '../render.js';
+import { seedsFor, seedDomains, seedCount } from '../seeds.js';
+import type { SeedDomain } from '../seeds.js';
 import { composeContinuation } from '../session.js';
 import { saveSpec, loadSpec, textPath } from '../store.js';
 import { TEMPLATES } from '../templates.js';
@@ -36,6 +38,7 @@ ${paint.bold('用法')}
   funnel refine  "<修改意见>"        对上一次的 spec 定点改一处，其余不动
   funnel continue "<追问>"           带上已确认的上一轮，只做这一轮的增量
   funnel templates                   列出可用的意图模板
+  funnel ideas   "<想法>"              从手写方向库里挑三条，给卡壳的人用
   funnel gate    "<原始请求>"        只看闸门判定，不生成
   funnel render  <spec.json>         从已有 spec 重新渲染（可换排版）
   funnel config  [show|set k v]      查看/修改配置
@@ -377,6 +380,38 @@ function commandContinue(args: Args): number {
   return problems.length > 0 ? 1 : 0;
 }
 
+function commandIdeas(args: Args): number {
+  const raw = readInput(args).trim();
+  if (raw.length === 0) {
+    note(paint.red('用法：funnel ideas "<你的想法>"'));
+    return 2;
+  }
+
+  const domainFlag = flagValue(args, 'domain') as SeedDomain | undefined;
+  const limitFlag = flagValue(args, 'limit');
+  const limit = limitFlag === undefined ? 3 : Math.max(1, Math.min(3, Number(limitFlag)));
+  const seeds = seedsFor(raw, {
+    limit,
+    ...(domainFlag !== undefined ? { domain: domainFlag } : {}),
+  });
+
+  if (flagOn(args, 'json')) {
+    process.stdout.write(`${JSON.stringify(seeds, null, 2)}\n`);
+    return 0;
+  }
+
+  process.stdout.write(
+    `手写方向库（共 ${seedCount()} 条，领域：${seedDomains().join(' / ')}）——不是 AI 生成的，选中才会进提示词\n`,
+  );
+  seeds.forEach((seed, index) => {
+    const cost = seed.cost === 'low' ? '低' : seed.cost === 'medium' ? '中' : '高';
+    process.stdout.write(`\n${index + 1}. ${seed.title}    ${paint.dim(`成本：${cost} · ${seed.id}`)}\n`);
+    process.stdout.write(`   ${seed.why}\n`);
+  });
+  process.stdout.write('\n');
+  return 0;
+}
+
 async function main(argv: string[]): Promise<number> {
   const args = parseArgs(argv);
 
@@ -402,6 +437,8 @@ async function main(argv: string[]): Promise<number> {
       return commandContinue(args);
     case 'templates':
       return commandTemplates();
+    case 'ideas':
+      return commandIdeas(args);
     case 'render':
       return commandRender(args);
     case 'config':

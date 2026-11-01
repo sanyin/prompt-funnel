@@ -21,6 +21,8 @@ import { loadConfig } from '../config.js';
 import { gate } from '../gate.js';
 import { applyPatches, REFINE_FORMS, parseRefineNote } from '../refine.js';
 import { renderSpec } from '../render.js';
+import { seedsFor } from '../seeds.js';
+import type { SeedDomain } from '../seeds.js';
 import { composeContinuation } from '../session.js';
 import { loadSpec } from '../store.js';
 import { coerceSpec, validateSpec } from '../validate.js';
@@ -142,6 +144,23 @@ const TOOLS: ToolDefinition[] = [
         keepOriginal: { type: 'string', enum: ['auto', 'on', 'off'] },
       },
       required: ['note'],
+    },
+  },
+  {
+    name: 'funnel_ideas',
+    description:
+      'Offer three directions when the user has a vague idea and cannot say what "new" or "competitive" should mean. ' +
+      'These are hand-written and curated, not generated: deterministic, offline, and each carries an id you can cite. ' +
+      'Call it only when the user explicitly asks for ideas or says they are stuck; never silently. ' +
+      'A direction is a candidate — it becomes part of the prompt only after the user picks one.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        text: { type: 'string', description: "The user's own words about what they want." },
+        domain: { type: 'string', enum: ['game', 'tool', 'writing', 'data', 'dev'] },
+        limit: { type: 'number', description: 'How many directions (max 3).' },
+      },
+      required: ['text'],
     },
   },
   {
@@ -342,6 +361,27 @@ async function callTool(name: string, args: unknown): Promise<string> {
         ...(notes.length > 0 ? notes.map((entry) => `- ${entry}`) : ['- 没有上一轮 spec，按普通请求处理']),
         `保真：原文保留 ${(rendered.fidelity.retention * 100).toFixed(0)}%　${rendered.fidelity.ok ? '通过' : '有错误'}`,
         ...rendered.fidelity.issues.map((issue) => `- ${issue.severity === 'error' ? '错误' : '提示'}：${issue.detail}`),
+      ].join('\n');
+    }
+    case 'funnel_ideas': {
+      const record = typeof args === 'object' && args !== null ? (args as Record<string, unknown>) : {};
+      const text = typeof record['text'] === 'string' ? record['text'].trim() : '';
+      if (text.length === 0) throw new Error('text 不能为空');
+      const domain = record['domain'];
+      const limit = typeof record['limit'] === 'number' ? record['limit'] : 3;
+      const seeds = seedsFor(text, {
+        limit,
+        ...(typeof domain === 'string' ? { domain: domain as SeedDomain } : {}),
+      });
+      return [
+        '## 手写方向库（不是 AI 生成）',
+        '',
+        ...seeds.map(
+          (seed, index) =>
+            `${index + 1}. **${seed.title}**（成本 ${seed.cost}，id: \`${seed.id}\`）\n   ${seed.why}`,
+        ),
+        '',
+        '用户选定哪一条，就把它作为约束写进 spec（source: user）；没选的不要出现在提示词里。',
       ].join('\n');
     }
     case 'funnel_compile': {

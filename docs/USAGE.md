@@ -83,7 +83,7 @@ funnel-mcp        # 独立可执行文件
 }
 ```
 
-暴露六个工具：
+暴露七个工具：
 
 | 工具 | 用途 | 成本 |
 | --- | --- | --- |
@@ -92,6 +92,7 @@ funnel-mcp        # 独立可执行文件
 | `funnel_render` | 校验并把 spec 渲染成最终提示词 | 纯本地 |
 | `funnel_continue` | 追问：带上已确认的上一轮 | 纯本地 |
 | `funnel_refine` | 定点改一处 | 纯本地 |
+| `funnel_ideas` | 手写方向库：卡壳时给三条候选 | 纯本地 |
 | `funnel_compile` | 一步到位（有 key 时可用 API 引擎） | 可选一次模型调用 |
 
 推荐流程是 `analyze → 用户改 → render`，追问走 `continue`，小修走 `refine`：语义工作由**宿主自己的模型**完成，不需要第二个 API key，也不额外花 token。
@@ -115,6 +116,7 @@ funnel review  "<请求>"     交互式收束
 funnel refine  "<意见>"     对上一次的 spec 定点改一处，其余不动
 funnel continue "<追问>"    带上已确认的上一轮，只做这一轮增量
 funnel templates            列出意图模板
+funnel ideas   "<想法>"     从手写方向库里挑三条（--domain / --limit / --json）
 funnel gate    "<请求>"     只看判定，不生成
 funnel render  [spec.json]  从已有 spec 重新渲染
 funnel config  [show|set]   查看 / 修改配置

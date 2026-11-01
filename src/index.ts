@@ -26,6 +26,8 @@ export { redactAll, redactOne, scanSecrets, marker, describe } from './redact.js
 export type { Finding, RedactKind } from './redact.js';
 export { answerAll, answerQuestion, questionsFor } from './questions.js';
 export type { Question } from './questions.js';
+export { seedsFor, detectDomain, seedDomains, seedCount, MAX_SEEDS } from './seeds.js';
+export type { Seed, SeedDomain } from './seeds.js';
 export { applyTemplate, getTemplate, TEMPLATES, templateIds } from './templates.js';
 export type { Template } from './templates.js';
 export { composeContinuation, rootObjective, summarize } from './session.js';

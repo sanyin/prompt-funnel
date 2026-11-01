@@ -17,7 +17,7 @@ test('notifications get no response', async () => {
   assert.equal(response, undefined);
 });
 
-test('six tools are listed with input schemas', async () => {
+test('seven tools are listed with input schemas', async () => {
   const response = await handleMessage(request('tools/list'));
   const names = response.result.tools.map((tool) => tool.name);
   assert.deepEqual(names, [
@@ -26,6 +26,7 @@ test('six tools are listed with input schemas', async () => {
     'funnel_render',
     'funnel_continue',
     'funnel_refine',
+    'funnel_ideas',
     'funnel_compile',
   ]);
   for (const tool of response.result.tools) {
