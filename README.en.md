@@ -113,6 +113,8 @@ raw text ──▶ gate ──pass──▶ sent unchanged (byte-identical)
 
 **Live A/B** (deepseek-chat, 60 calls): assumptions stated 5/30 → 18/30; self-check language 2/30 → 17/30; about 258 extra input tokens per compiled request. Everything it does not prove is in [docs/AB-REPORT.md](./docs/AB-REPORT.md). No unmeasured numbers in this README.
 
+**Cost**: the absolute overhead is **+105 to +245 tokens** depending on style; the default is the expensive one. Measured table, three tiers, and when not to use it: [docs/COST.md](./docs/COST.md). `funnel compile --budget 150` downgrades automatically and tells you.
+
 ## Layout
 
 ```

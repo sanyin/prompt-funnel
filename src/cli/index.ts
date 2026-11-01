@@ -19,6 +19,7 @@ import { renderSpec } from '../render.js';
 import { composeContinuation } from '../session.js';
 import { saveSpec, loadSpec, textPath } from '../store.js';
 import { TEMPLATES } from '../templates.js';
+import { estimateTokens } from '../text.js';
 import type { PromptSpec, StyleName } from '../types.js';
 import { coerceSpec, validateSpec } from '../validate.js';
 import { VERSION } from '../version.js';
@@ -106,14 +107,42 @@ async function commandCompile(args: Args): Promise<number> {
     ...(template !== undefined ? { template } : {}),
   });
 
-  if (result.passedThrough) note(paint.green('✓ 闸门放行：已足够清晰，未改写'));
-  for (const entry of result.notes) note(paint.dim(`· ${entry}`));
-  const problems = result.rendered.fidelity.issues.filter((issue) => issue.severity === 'error');
+  const budgetFlag = flagValue(args, 'budget');
+  const budget = budgetFlag === undefined ? undefined : Number(budgetFlag);
+  let output = result;
+
+  if (budget !== undefined && Number.isFinite(budget) && estimateTokens(result.rendered.text) > budget) {
+    const lean = await compile(raw, {
+      force: true,
+      engine: engine ?? 'rules',
+      style: 'compact',
+      keepOriginal: 'off',
+      ...(template !== undefined ? { template } : {}),
+    });
+    if (estimateTokens(lean.rendered.text) < estimateTokens(result.rendered.text)) {
+      output = lean;
+      note(paint.dim(`超出 ${budget} tokens 预算，已降级为 compact 且不附原文`));
+    }
+    if (estimateTokens(output.rendered.text) > budget) {
+      note(paint.yellow(`压缩后仍超出预算（${estimateTokens(output.rendered.text)} > ${budget}）；长请求的收益本来就小，可以直接发原文`));
+    }
+  }
+
+  if (output.passedThrough) note(paint.green('✓ 闸门放行：已足够清晰，未改写'));
+  for (const entry of output.notes) note(paint.dim(`· ${entry}`));
+  const problems = output.rendered.fidelity.issues.filter((issue) => issue.severity === 'error');
   for (const issue of problems) note(paint.red(`! ${issue.detail}`));
 
-  emit(result.rendered.text, result.spec, args);
+  const before = estimateTokens(raw);
+  const after = estimateTokens(output.rendered.text);
+  const growth = after - before;
+  // A ratio on a ten-token input says nothing; the absolute overhead is the real cost.
+  const ratio = before >= 40 ? `, ${(growth / before).toFixed(1)}×` : '';
+  note(paint.dim(`tokens ${before} → ${after}${output.passedThrough ? '' : `  (+${growth}${ratio})`}`));
+
+  emit(output.rendered.text, output.spec, args);
   if (!flagOn(args, 'json') && flagValue(args, 'out') === undefined) {
-    saveSpec(result.spec, result.rendered.text);
+    saveSpec(output.spec, output.rendered.text);
     note(paint.dim(`已保存 spec：.funnel/last.json · 提示词：.funnel/last.md`));
   }
   return problems.length > 0 ? 1 : 0;

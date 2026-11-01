@@ -114,6 +114,8 @@ MCP 只做确定性的事（判定 / 分析 / 校验 / 渲染），**语义工�
 
 **真实模型 A/B**（deepseek-chat，60 次调用）：假设外显 5/30 → 18/30，自检表述 2/30 → 17/30，每条多约 258 输入 tokens。全文与不可证明的部分见 [docs/AB-REPORT.md](./docs/AB-REPORT.md)。README 里不放没测过的数字。
 
+**成本**：绝对开销约 **+105 ~ +245 tokens**（取决于排版），默认档最贵。实测表、三档做法和「什么时候别用」在 [docs/COST.md](./docs/COST.md)。`funnel compile --budget 150` 会在超预算时自动降级并告诉你。
+
 ## 目录
 
 ```

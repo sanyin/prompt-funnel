@@ -194,12 +194,16 @@ npm run playground     # 构建 site/ 并在 http://127.0.0.1:8080 起服务
 | --- | --- |
 | `--style bluf\|compact\|checklist` | 排版 |
 | `--engine auto\|rules\|api\|host` | `auto` = 有 key 走 API，否则规则 |
+| `--template <id>` | 意图模板，见下 |
+| `--budget <n>` | 超过 n tokens 就自动降级到 `compact` + 不附原文；再超会明说 |
 | `--force` | 闸门放行时也强制收束 |
 | `--keep-original auto\|on\|off` | 是否在末尾附原文（默认 auto：有假设/锚点时附） |
 | `--json` | 输出 spec 而不是提示词 |
 | `--out <file>` | 写入文件 |
 | `-f, --file <path>` | 从文件读请求 |
 | `--note "<意见>"` | 改写意见（API 引擎会用它） |
+
+每次 `compile` 都会在 stderr 打一行实际成本，例如 `tokens 10 → 266 (+256)`。绝对值才是成本，倍数只说明输入有多短——见 [COST.md](./COST.md)。
 
 退出码：`0` 成功；`1` 保真校验有 error（可接 CI）；`2` 用法错误；`130` 用户取消。
 
