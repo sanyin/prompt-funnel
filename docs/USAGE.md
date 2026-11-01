@@ -9,6 +9,9 @@ npx prompt-funnel gate "帮我优化一下这个东西"
 # 或装到全局
 pnpm add -g prompt-funnel
 npm i -g prompt-funnel
+
+# 还没发到 npm 时，也可以直接从仓库装（会自动构建）
+npm i -g github:sanyin/prompt-funnel
 ```
 
 要求 Node ≥ 22。**零运行时依赖**，不联网也能用（规则引擎）。

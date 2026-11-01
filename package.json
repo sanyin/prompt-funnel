@@ -31,6 +31,7 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
+    "prepare": "npm run build",
     "test": "npm run build && node --test \"test/*.test.mjs\"",
     "eval": "npm run build && node evals/run.mjs",
     "eval:live": "npm run build && node evals/live.mjs",
