@@ -8,7 +8,7 @@
 
 > 在请求进入模型之前，把缺失的信息显式化。该问的就问，猜的就标出来，编的一律拦掉。
 
-[English](./README.en.md) · [设计书](./docs/BRIEF.md) · [设计说明](./docs/DESIGN.md) · [用法](./docs/USAGE.md) · [实测](./docs/AB-REPORT.md)
+[English](./README.en.md) · [设计书](./docs/BRIEF.md) · [一页版](./docs/BRIEF-1P.md) · [设计说明](./docs/DESIGN.md) · [用法](./docs/USAGE.md) · [实测](./docs/AB-REPORT.md)
 
 ![playground](docs/assets/playground.png)
 

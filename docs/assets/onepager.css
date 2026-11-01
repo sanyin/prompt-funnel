@@ -1,0 +1,103 @@
+/* One-page variant: everything above the fold on a single A4 sheet. */
+@page {
+  size: A4;
+  margin: 12mm 15mm;
+}
+
+body {
+  font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", -apple-system, sans-serif;
+  color: #1a1a18;
+  font-size: 9.8pt;
+  line-height: 1.66;
+  max-width: 180mm;
+  margin: 0 auto;
+}
+
+header#title-block-header {
+  display: none;
+}
+
+h1 {
+  font-size: 18pt;
+  margin: 0 0 0.3em;
+  padding-bottom: 0.2em;
+  border-bottom: 2px solid #2f6f4f;
+}
+
+h2 {
+  font-size: 12pt;
+  margin: 0.85em 0 0.3em;
+  padding-left: 0.45em;
+  border-left: 3px solid #2f6f4f;
+  page-break-after: avoid;
+}
+
+p {
+  margin: 0.4em 0;
+}
+
+blockquote {
+  margin: 0.5em 0;
+  padding: 0.5em 0.8em;
+  background: #f7f7f3;
+  border-left: 3px solid #2f6f4f;
+  color: #3a3a36;
+}
+
+blockquote p {
+  margin: 0;
+}
+
+table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 0.5em 0;
+  font-size: 9.6pt;
+}
+
+th,
+td {
+  border: 1px solid #dcdcd6;
+  padding: 0.3em 0.5em;
+  text-align: left;
+  vertical-align: top;
+}
+
+th {
+  background: #f4f4f0;
+  font-weight: 600;
+}
+
+ol,
+ul {
+  margin: 0.35em 0;
+  padding-left: 1.3em;
+}
+
+li {
+  margin: 0.28em 0;
+}
+
+code {
+  font-family: "Cascadia Mono", Consolas, monospace;
+  font-size: 8.6pt;
+  background: #f4f4f0;
+  padding: 0.05em 0.3em;
+  border-radius: 3px;
+}
+
+strong {
+  font-weight: 600;
+}
+
+p.foot {
+  margin-top: 1em;
+  padding-top: 0.6em;
+  border-top: 1px solid #dcdcd6;
+  color: #6f6f68;
+  font-size: 8.4pt;
+  text-align: center;
+}
+
+
+
