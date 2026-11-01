@@ -36,6 +36,16 @@ export const CONTEXT_RE =
 export const ARTIFACT_RE =
   /(?:代码|源码|文件|脚本|函数|接口|组件|页面|服务|配置|测试用例|单元测试|文档|报告|方案|计划|清单|表格|图表|邮件|文案|文章|总结|摘要|提纲|大纲|注释|commit|PR|pull request|README|JSON|YAML|CSV|Markdown|SQL|正则|code|file|script|function|endpoint|component|doc|docs|report|plan|checklist|table|email|draft|outline|essay|summary)/iu;
 
+/**
+ * Nouns for things you hand over, as opposed to code entities you talk about.
+ *
+ * "帮我看看这个函数" mentions a noun but asks for a judgement, not a file; treating
+ * it as the deliverable would both mis-fill the section and block a template from
+ * supplying the real one.
+ */
+export const DELIVERABLE_RE =
+  /(?:代码|源码|文件|脚本|文档|报告|方案|计划|清单|表格|图表|邮件|文案|文章|总结|摘要|提纲|大纲|测试用例|单元测试|commit|PR|pull request|README|JSON|YAML|CSV|Markdown|SQL|code|file|script|doc|docs|report|plan|checklist|table|email|draft|outline|essay|summary)/iu;
+
 /** Question shapes, including Chinese wh-words that need no question mark. */
 const QUESTION_TAIL = /[?？]\s*$/u;
 const QUESTION_HEAD =

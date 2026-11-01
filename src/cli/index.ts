@@ -16,7 +16,9 @@ import { configPath, loadConfig, resolveApiKey, saveConfig } from '../config.js'
 import { gate } from '../gate.js';
 import { applyPatches, REFINE_FORMS, parseRefineNote } from '../refine.js';
 import { renderSpec } from '../render.js';
+import { composeContinuation } from '../session.js';
 import { saveSpec, loadSpec, textPath } from '../store.js';
+import { TEMPLATES } from '../templates.js';
 import type { PromptSpec, StyleName } from '../types.js';
 import { coerceSpec, validateSpec } from '../validate.js';
 import { VERSION } from '../version.js';
@@ -30,10 +32,13 @@ ${paint.bold('用法')}
   funnel compile "<原始请求>"        收束并输出提示词（管道友好，诊断走 stderr）
   funnel review  "<原始请求>"        交互式：收束 → 改 → 认可 → 输出
   funnel refine  "<修改意见>"        对上一次的 spec 定点改一处，其余不动
+  funnel continue "<追问>"           带上已确认的上一轮，只做这一轮的增量
+  funnel templates                   列出可用的意图模板
   funnel gate    "<原始请求>"        只看闸门判定，不生成
   funnel render  <spec.json>         从已有 spec 重新渲染（可换排版）
   funnel config  [show|set k v]      查看/修改配置
   funnel mcp                         启动 MCP server（stdio）
+  funnel hook                        Claude Code 钩子入口（读 stdin）
 
 ${paint.bold('常用参数')}
   --style bluf|compact|checklist     排版：分节 / 紧凑 / 勾选清单
@@ -91,12 +96,14 @@ async function commandCompile(args: Args): Promise<number> {
   const style = flagValue(args, 'style') as StyleName | undefined;
   const engine = flagValue(args, 'engine') as 'auto' | 'rules' | 'api' | 'host' | undefined;
   const keepOriginal = flagValue(args, 'keep-original') as 'auto' | 'on' | 'off' | undefined;
+  const template = flagValue(args, 'template');
 
   const result = await compile(raw, {
     force: flagOn(args, 'force'),
     ...(style !== undefined ? { style } : {}),
     ...(engine !== undefined ? { engine } : {}),
     ...(keepOriginal !== undefined ? { keepOriginal } : {}),
+    ...(template !== undefined ? { template } : {}),
   });
 
   if (result.passedThrough) note(paint.green('✓ 闸门放行：已足够清晰，未改写'));
@@ -282,6 +289,42 @@ function commandRefine(args: Args): number {
   return problems.length > 0 ? 1 : 0;
 }
 
+function commandTemplates(): number {
+  const entries = Object.values(TEMPLATES);
+  const width = Math.max(...entries.map((entry) => entry.id.length));
+  for (const entry of entries) {
+    process.stdout.write(`${entry.id.padEnd(width)}  ${entry.label}\n`);
+    process.stdout.write(`${' '.repeat(width + 2)}${entry.description}\n`);
+  }
+  return 0;
+}
+
+function commandContinue(args: Args): number {
+  const followUp = args.words.join(' ').trim();
+  if (followUp.length === 0) {
+    note(paint.red('用法：funnel continue "<这一轮要改/要加的东西>"'));
+    return 2;
+  }
+
+  const previous = loadSpec();
+  const { spec, notes } = composeContinuation(previous, followUp);
+
+  const style = flagValue(args, 'style') as StyleName | undefined;
+  const keepOriginal = flagValue(args, 'keep-original') as 'auto' | 'on' | 'off' | undefined;
+  const rendered = renderSpec(spec, {
+    ...(style !== undefined ? { style } : {}),
+    ...(keepOriginal !== undefined ? { keepOriginal } : {}),
+  });
+
+  for (const entry of notes) note(paint.dim(`· ${entry}`));
+  const problems = rendered.fidelity.issues.filter((issue) => issue.severity === 'error');
+  for (const issue of problems) note(paint.red(`! ${issue.detail}`));
+
+  saveSpec(spec, rendered.text);
+  emit(rendered.text, spec, args);
+  return problems.length > 0 ? 1 : 0;
+}
+
 async function main(argv: string[]): Promise<number> {
   const args = parseArgs(argv);
 
@@ -303,6 +346,10 @@ async function main(argv: string[]): Promise<number> {
       return await commandReview(args);
     case 'refine':
       return commandRefine(args);
+    case 'continue':
+      return commandContinue(args);
+    case 'templates':
+      return commandTemplates();
     case 'render':
       return commandRender(args);
     case 'config':
@@ -314,7 +361,7 @@ async function main(argv: string[]): Promise<number> {
     }
     case 'hook': {
       const { runHookMain } = await import('../hook-run.js');
-      runHookMain(args.words);
+      await runHookMain(args.words);
       return 0;
     }
     default:

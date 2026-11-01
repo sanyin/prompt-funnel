@@ -21,6 +21,7 @@ import { loadConfig } from '../config.js';
 import { gate } from '../gate.js';
 import { applyPatches, REFINE_FORMS, parseRefineNote } from '../refine.js';
 import { renderSpec } from '../render.js';
+import { composeContinuation } from '../session.js';
 import { loadSpec } from '../store.js';
 import { coerceSpec, validateSpec } from '../validate.js';
 import type { PromptSpec, StyleName } from '../types.js';
@@ -69,6 +70,10 @@ const TOOLS: ToolDefinition[] = [
       properties: {
         text: { type: 'string', description: "The user's raw request, verbatim." },
         style: { type: 'string', enum: STYLE_ENUM, description: 'Rendering style to plan for.' },
+        template: {
+          type: 'string',
+          description: 'Intent template id (code-review, debug, data-analysis, writing, image-prompt, research).',
+        },
       },
       required: ['text'],
     },
@@ -93,6 +98,24 @@ const TOOLS: ToolDefinition[] = [
         },
       },
       required: ['spec'],
+    },
+  },
+  {
+    name: 'funnel_continue',
+    description:
+      'Handle a follow-up turn ("再补个测试", "继续", "顺便加个日志") without losing what was already agreed. ' +
+      'Takes the previous PromptSpec as settled context and analyses only the new increment, so the model sees ' +
+      '"已确认（上一轮）" followed by this turn\'s ask. ' +
+      'Use this instead of funnel_analyze whenever a spec already exists and the user is adding to it.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        text: { type: 'string', description: 'This turn only — what is being added or changed.' },
+        spec: { type: 'object', description: 'Previous spec. Omit to use the most recent one on disk.' },
+        style: { type: 'string', enum: STYLE_ENUM },
+        keepOriginal: { type: 'string', enum: ['auto', 'on', 'off'] },
+      },
+      required: ['text'],
     },
   },
   {
@@ -178,8 +201,13 @@ async function callTool(name: string, args: unknown): Promise<string> {
     case 'funnel_analyze': {
       const source = text(args);
       if (source.trim().length === 0) throw new Error('text 不能为空');
-      const style = styleOf((args as Record<string, unknown>)['style']);
-      const spec = analyze(source, style !== undefined ? { style } : {});
+      const record = args as Record<string, unknown>;
+      const style = styleOf(record['style']);
+      const template = typeof record['template'] === 'string' ? record['template'] : undefined;
+      const spec = analyze(source, {
+        ...(style !== undefined ? { style } : {}),
+        ...(template !== undefined ? { template } : {}),
+      });
       return [
         '## spec（可被用户修改后传回 funnel_render）',
         '```json',
@@ -268,6 +296,38 @@ async function callTool(name: string, args: unknown): Promise<string> {
         '## 改了什么',
         ...applied.map((entry) => `- ${entry}`),
         '',
+        `保真：原文保留 ${(rendered.fidelity.retention * 100).toFixed(0)}%　${rendered.fidelity.ok ? '通过' : '有错误'}`,
+        ...rendered.fidelity.issues.map((issue) => `- ${issue.severity === 'error' ? '错误' : '提示'}：${issue.detail}`),
+      ].join('\n');
+    }
+    case 'funnel_continue': {
+      const record = typeof args === 'object' && args !== null ? (args as Record<string, unknown>) : {};
+      const text = typeof record['text'] === 'string' ? record['text'].trim() : '';
+      if (text.length === 0) throw new Error('text 不能为空');
+
+      const given = record['spec'];
+      const fromCall =
+        typeof given === 'object' && given !== null && typeof (given as PromptSpec).meta?.source === 'string'
+          ? (given as PromptSpec)
+          : undefined;
+      const previous = fromCall ?? loadSpec();
+
+      const { spec, notes } = composeContinuation(previous, text);
+      const style = styleOf(record['style']);
+      const keepOriginal = keepOf(record['keepOriginal']);
+      const rendered = renderSpec(spec, {
+        ...(style !== undefined ? { style } : {}),
+        ...(keepOriginal !== undefined ? { keepOriginal } : {}),
+      });
+
+      return [
+        '## prompt（本轮发给模型的内容）',
+        '```markdown',
+        rendered.text.trimEnd(),
+        '```',
+        '',
+        '## 说明',
+        ...(notes.length > 0 ? notes.map((entry) => `- ${entry}`) : ['- 没有上一轮 spec，按普通请求处理']),
         `保真：原文保留 ${(rendered.fidelity.retention * 100).toFixed(0)}%　${rendered.fidelity.ok ? '通过' : '有错误'}`,
         ...rendered.fidelity.issues.map((issue) => `- ${issue.severity === 'error' ? '错误' : '提示'}：${issue.detail}`),
       ].join('\n');
@@ -383,3 +443,4 @@ export async function serve(): Promise<void> {
     if (response !== undefined) process.stdout.write(`${JSON.stringify(response)}\n`);
   }
 }
+

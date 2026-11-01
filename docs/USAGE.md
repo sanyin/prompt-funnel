@@ -83,16 +83,18 @@ funnel-mcp        # 独立可执行文件
 }
 ```
 
-暴露四个工具：
+暴露六个工具：
 
 | 工具 | 用途 | 成本 |
 | --- | --- | --- |
 | `funnel_gate` | 判定要不要收束 | 纯本地，< 1ms |
 | `funnel_analyze` | 产出 spec + 给用户看的 review 摘要 | 纯本地 |
 | `funnel_render` | 校验并把 spec 渲染成最终提示词 | 纯本地 |
-| `funnel_compile` | 一次搞定（有 key 时可用 API 引擎） | 可选一次模型调用 |
+| `funnel_continue` | 追问：带上已确认的上一轮 | 纯本地 |
+| `funnel_refine` | 定点改一处 | 纯本地 |
+| `funnel_compile` | 一步到位（有 key 时可用 API 引擎） | 可选一次模型调用 |
 
-推荐流程是 `analyze → 用户改 → render`：语义工作由**宿主自己的模型**完成，不需要第二个 API key，也不额外花 token。
+推荐流程是 `analyze → 用户改 → render`，追问走 `continue`，小修走 `refine`：语义工作由**宿主自己的模型**完成，不需要第二个 API key，也不额外花 token。
 
 ### 3. 装成 skill（Codex / DSH / Claude Code）
 
@@ -111,12 +113,56 @@ skill 里写清了「什么时候触发、循环怎么走、哪些事不许做�
 funnel compile "<请求>"     收束并输出提示词
 funnel review  "<请求>"     交互式收束
 funnel refine  "<意见>"     对上一次的 spec 定点改一处，其余不动
+funnel continue "<追问>"    带上已确认的上一轮，只做这一轮增量
+funnel templates            列出意图模板
 funnel gate    "<请求>"     只看判定，不生成
 funnel render  [spec.json]  从已有 spec 重新渲染
 funnel config  [show|set]   查看 / 修改配置
 funnel mcp                  启动 MCP server
 funnel hook                 Claude Code 钩子入口（读 stdin）
 ```
+
+### 追问续接：`continue`
+
+「再补个测试」这句话单独发出去没有意义，重跑分析又会把上一轮的东西丢掉。`continue` 把上一轮已确认的内容作为「已确认」块带进新提示词，只分析本轮的增量：
+
+```bash
+funnel compile "帮我写个爬虫，顺便加个代理池"
+funnel continue "再补一个断点续传"
+```
+
+```markdown
+## 已确认（上一轮）
+
+目标：帮我写个爬虫
+要求：
+  1. 加个代理池
+交付：可运行的改动 + 简短的变更说明
+
+## 目标
+
+再补一个断点续传
+```
+
+连续多轮也没问题：第三轮的「已确认」会带上最初的目标 + 最近一轮的内容，不会把根目标滚掉。
+
+### 意图模板
+
+```bash
+funnel templates                                  # 列出全部
+funnel compile "帮我看看这个函数" --template code-review
+```
+
+模板补的是**「怎样算做完」**——这是模糊请求最常缺的一半：
+
+| 模板 | 补上的验收 |
+| --- | --- |
+| `code-review` | 按严重程度分组、每条给出可执行的修改方式 |
+| `debug` | 给出能复现或能排除该原因的具体命令 |
+| `data-analysis` | 查询能直接运行、结论与数字对得上 |
+| `image-prompt` | 只有提示词本身，没有前后说明 |
+
+模板加的内容一律标 `（假定）`，可以删。它只补「答案该长什么样」，不会替你补事实。
 
 ### 单点修改：`refine`
 

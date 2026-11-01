@@ -97,6 +97,8 @@ export interface PromptSpec {
   openQuestions: string[];
   /** Verbatim spans that must survive compilation unchanged. */
   anchors: string[];
+  /** Settled context carried from the previous turn, when this is a follow-up. */
+  carried?: Item;
   meta: SpecMeta;
 }
 
@@ -110,6 +112,8 @@ export interface SpecMeta {
   createdAt: string;
   /** Free-form refinement note from the last round, if any. */
   note?: string;
+  /** Id of the intent template that shaped this spec, if any. */
+  template?: string;
 }
 
 /** Which analyzer produced the spec. */
@@ -161,6 +165,8 @@ export interface CompileOptions {
   force?: boolean;
   /** Re-attach the source text: `auto` only when assumptions or questions exist. */
   keepOriginal?: 'auto' | 'on' | 'off';
+  /** Intent template id (see `funnel templates`). */
+  template?: string;
   now?: string;
 }
 

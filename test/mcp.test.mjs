@@ -17,10 +17,17 @@ test('notifications get no response', async () => {
   assert.equal(response, undefined);
 });
 
-test('five tools are listed with input schemas', async () => {
+test('six tools are listed with input schemas', async () => {
   const response = await handleMessage(request('tools/list'));
   const names = response.result.tools.map((tool) => tool.name);
-  assert.deepEqual(names, ['funnel_gate', 'funnel_analyze', 'funnel_render', 'funnel_refine', 'funnel_compile']);
+  assert.deepEqual(names, [
+    'funnel_gate',
+    'funnel_analyze',
+    'funnel_render',
+    'funnel_continue',
+    'funnel_refine',
+    'funnel_compile',
+  ]);
   for (const tool of response.result.tools) {
     assert.equal(tool.inputSchema.type, 'object');
     assert.ok(tool.description.length > 40);

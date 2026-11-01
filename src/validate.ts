@@ -58,7 +58,9 @@ export function checkFidelity(spec: PromptSpec, body: string): FidelityReport {
   }
 
   const kept = retention(source, body);
-  if (kept < MIN_RETENTION) {
+  // A continuation deliberately compresses earlier turns, so a low score there is
+  // expected rather than evidence that meaning was dropped.
+  if (kept < MIN_RETENTION && spec.carried === undefined) {
     issues.push(
       issue('low-retention', `原文字词保留率 ${(kept * 100).toFixed(0)}%，低于 ${MIN_RETENTION * 100}%，可能删掉了关键信息`, 'warn'),
     );
@@ -222,6 +224,7 @@ export function coerceSpec(value: unknown, base: PromptSpec): PromptSpec {
     assumptions: assumptions.length > 0 ? assumptions : base.assumptions,
     openQuestions: openQuestions.length > 0 ? openQuestions : base.openQuestions,
     anchors: base.anchors,
+    ...(base.carried !== undefined ? { carried: base.carried } : {}),
     meta: base.meta,
   };
 }

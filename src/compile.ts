@@ -15,6 +15,7 @@ import type { FunnelConfig } from './config.js';
 import { gate } from './gate.js';
 import { requestSpec } from './llm.js';
 import { renderSpec } from './render.js';
+import { applyTemplate, getTemplate } from './templates.js';
 import { checkFidelity, coerceSpec } from './validate.js';
 
 /** Injectable seams, used by tests and by hosts that supply their own model. */
@@ -44,7 +45,7 @@ export async function compile(raw: string, options: CompileOptions = {}, deps: C
   const base = analyzeWithRules(source, verdict, options);
   base.meta.style = style;
 
-  if (options.force !== true && verdict.decision === 'pass') {
+  if (options.force !== true && options.template === undefined && verdict.decision === 'pass') {
     const fidelity = checkFidelity(base, source);
     return {
       spec: base,
@@ -84,6 +85,11 @@ export async function compile(raw: string, options: CompileOptions = {}, deps: C
   if (options.note !== undefined) spec.meta.note = options.note;
   spec.meta.style = style;
 
+  // Template defaults are applied last so an API engine cannot drop them: they
+  // are the "what done looks like" half that a vague request never supplies.
+  const template = getTemplate(options.template);
+  if (template.id !== 'default') spec = applyTemplate(spec, template);
+
   const rendered = renderSpec(spec, {
     style,
     ...(options.keepOriginal !== undefined ? { keepOriginal: options.keepOriginal } : {}),
@@ -96,7 +102,9 @@ export async function compile(raw: string, options: CompileOptions = {}, deps: C
 export function analyze(raw: string, options: CompileOptions = {}): PromptSpec {
   const source = raw.trim();
   if (source.length === 0) throw new Error('输入为空');
-  const spec = analyzeWithRules(source, gate(source), options);
+  let spec = analyzeWithRules(source, gate(source), options);
   if (options.style !== undefined) spec.meta.style = options.style;
+  const template = getTemplate(options.template);
+  if (template.id !== 'default') spec = applyTemplate(spec, template);
   return spec;
 }

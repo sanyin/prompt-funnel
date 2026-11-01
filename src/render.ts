@@ -34,6 +34,7 @@ interface Labels {
   ifWrong: string;
   colon: string;
   separator: string;
+  carried: string;
 }
 
 const LABELS: Record<Lang, Labels> = {
@@ -55,6 +56,7 @@ const LABELS: Record<Lang, Labels> = {
     ifWrong: '若不符',
     colon: '：',
     separator: '；',
+    carried: '已确认（上一轮）',
   },
   en: {
     objective: 'Objective',
@@ -74,6 +76,7 @@ const LABELS: Record<Lang, Labels> = {
     ifWrong: 'If not',
     colon: ': ',
     separator: '; ',
+    carried: 'Already agreed (previous turn)',
   },
 };
 
@@ -122,7 +125,11 @@ function deliverableLines(spec: PromptSpec, labels: Labels): string[] {
 
 /** `bluf`: the fully structured 总-分-总 rendering. */
 function renderBluf(spec: PromptSpec, labels: Labels): string[] {
-  const out: string[] = [`## ${labels.objective}`, '', itemText(spec.objective, labels), ''];
+  const out: string[] = [];
+  if (spec.carried !== undefined) {
+    out.push(`## ${labels.carried}`, '', spec.carried.text.trim(), '');
+  }
+  out.push(`## ${labels.objective}`, '', itemText(spec.objective, labels), '');
 
   out.push(...section(labels.context, spec.context.map((item) => `- ${line(item, labels)}`)));
 
@@ -147,7 +154,11 @@ function renderBluf(spec: PromptSpec, labels: Labels): string[] {
 
 /** `compact`: for short requests where headers would outweigh the content. */
 function renderCompact(spec: PromptSpec, labels: Labels): string[] {
-  const out: string[] = [`**${labels.objective}**${labels.colon}${itemText(spec.objective, labels)}`];
+  const out: string[] = [];
+  if (spec.carried !== undefined) {
+    out.push(`**${labels.carried}**${labels.colon}${spec.carried.text.replace(/\s*\n\s*/gu, ' / ')}`);
+  }
+  out.push(`**${labels.objective}**${labels.colon}${itemText(spec.objective, labels)}`);
   const bullet = (heading: string, values: string[]): void => {
     if (values.length > 0) out.push(`**${heading}**${labels.colon}${values.join(labels.separator)}`);
   };
@@ -172,7 +183,11 @@ function renderCompact(spec: PromptSpec, labels: Labels): string[] {
 
 /** `checklist`: everything as checkboxes, for agent handoff. */
 function renderChecklist(spec: PromptSpec, labels: Labels): string[] {
-  const out: string[] = [`- [ ] ${kv(labels.objective, itemText(spec.objective, labels), labels)}`];
+  const out: string[] = [];
+  if (spec.carried !== undefined) {
+    out.push(`**${labels.carried}**${labels.colon}${spec.carried.text.replace(/\s*\n\s*/gu, ' / ')}`, '');
+  }
+  out.push(`- [ ] ${kv(labels.objective, itemText(spec.objective, labels), labels)}`);
   for (const requirement of spec.requirements) out.push(`- [ ] ${line(requirement, labels)}`);
   for (const item of spec.constraints) out.push(`- [ ] ${kv(labels.constraints, line(item, labels), labels)}`);
   for (const item of spec.nonGoals) out.push(`- [ ] ${kv(labels.nonGoals, line(item, labels), labels)}`);

@@ -10,4 +10,4 @@
 
 import { runHookMain } from './hook-run.js';
 
-runHookMain();
+await runHookMain();

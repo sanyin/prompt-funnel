@@ -23,9 +23,9 @@ import type {
 import { gate } from './gate.js';
 import {
   ACCEPTANCE_RE,
-  ARTIFACT_RE,
   CONSTRAINT_RE,
   CONTEXT_RE,
+  DELIVERABLE_RE,
   NON_GOAL_RE,
   detectIntent,
   hasTaskVerb,
@@ -125,12 +125,12 @@ function collectAnchors(raw: string): { anchors: string[]; body: string } {
   return { anchors: anchors.filter((value) => value.length > 0), body };
 }
 
-/** Pull the narrowest clause containing an artifact noun. */
+/** Pull the narrowest clause that names a deliverable. */
 function findDeliverableSentence(units: Unit[]): string | undefined {
   for (const unit of units) {
-    if (!ARTIFACT_RE.test(unit.text)) continue;
+    if (!DELIVERABLE_RE.test(unit.text)) continue;
     const clauses = unit.text.split(/[，,]/u).map((clause) => clause.trim());
-    return clauses.find((value) => ARTIFACT_RE.test(value)) ?? unit.text;
+    return clauses.find((value) => DELIVERABLE_RE.test(value)) ?? unit.text;
   }
   return undefined;
 }
@@ -429,3 +429,4 @@ function toItems(units: Unit[]): Item[] {
 export function renderLanguage(raw: string): 'zh' | 'en' {
   return hasCJK(raw) ? 'zh' : 'en';
 }
+
