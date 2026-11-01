@@ -11,7 +11,7 @@ pnpm add -g prompt-funnel
 npm i -g prompt-funnel
 ```
 
-要求 Node ≥ 20.11。**零运行时依赖**，不联网也能用（规则引擎）。
+要求 Node ≥ 22。**零运行时依赖**，不联网也能用（规则引擎）。
 
 ## 30 秒上手
 

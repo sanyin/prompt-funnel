@@ -2,7 +2,8 @@
 
 > 在请求进入模型之前，把缺失的信息显式化。该问的就问，猜的就标出来，编的一律拦掉。
 
-[![node](https://img.shields.io/badge/node-%E2%89%A520.11-339933)](package.json)
+[![node](https://img.shields.io/badge/node-%E2%89%A522-339933)](package.json)
+[![ci](https://github.com/sanyin/prompt-funnel/actions/workflows/ci.yml/badge.svg)](https://github.com/sanyin/prompt-funnel/actions/workflows/ci.yml)
 [![deps](https://img.shields.io/badge/runtime%20deps-0-blue)](package.json)
 [![license](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 

@@ -19,7 +19,7 @@ npm test             # 39 条单测（先 build）
 npm run eval         # 16 条离线用例
 ```
 
-要求 Node ≥ 20.11。**不引入运行时依赖**——这是有意的：CLI 要在 agent 的沙箱里秒起，MCP server 不能因为一次 `npm install` 失败而消失。加依赖需要在 PR 里说明为什么标准库做不到。
+要求 Node ≥ 22。**不引入运行时依赖**——这是有意的：CLI 要在 agent 的沙箱里秒起，MCP server 不能因为一次 `npm install` 失败而消失。加依赖需要在 PR 里说明为什么标准库做不到。
 
 ## 加一条闸门规则
 
