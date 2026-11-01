@@ -1,0 +1,11 @@
+case,A_text,B_text,A_arm,B_arm,命中意图(1-5),遵守约束(1-5),有无编造(0/1),返工轮次(0/1/2)
+vague-optimize,vague-optimize.raw.1.md,vague-optimize.compiled.1.md,raw,compiled,,,,
+multi-goal,multi-goal.raw.1.md,multi-goal.compiled.1.md,raw,compiled,,,,
+numbered-list,numbered-list.compiled.1.md,numbered-list.raw.1.md,compiled,raw,,,,
+english,english.raw.1.md,english.compiled.1.md,raw,compiled,,,,
+write-task,write-task.compiled.1.md,write-task.raw.1.md,compiled,raw,,,,
+debug-report,debug-report.compiled.1.md,debug-report.raw.1.md,compiled,raw,,,,
+long-pasta,long-pasta.raw.1.md,long-pasta.compiled.1.md,raw,compiled,,,,
+english-vague,english-vague.raw.1.md,english-vague.compiled.1.md,raw,compiled,,,,
+plan-request,plan-request.compiled.1.md,plan-request.raw.1.md,compiled,raw,,,,
+garbled,garbled.compiled.1.md,garbled.raw.1.md,compiled,raw,,,,
