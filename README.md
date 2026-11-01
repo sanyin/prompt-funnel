@@ -141,7 +141,7 @@ docs/            DESIGN / SPEC / USAGE / EVAL / AB-REPORT / EXAMPLE
 - 一句里同时有约束和动作时不拆（「用 TypeScript 重写这个模块」），整句留在「要求」里。
 - `refine` 只认 8 种固定句式；看不懂时直接列出来，不猜。
 - 追问续接是「拼接 + 摘要」，不做真正的对话理解；超过几轮后 `已确认` 块会变长，需要手动精简。
-- Hook 装在 Claude Code 上：进程级已验证，**端到端未在 headless 模式下确认**（本机 `claude -p` 会超时），交互式使用前请自测一次。
+- Hook 装在 Claude Code 上：已用探针确认 Claude Code 会以正确 payload 调用 `UserPromptSubmit`，`funnel hook` 本身有单测且响应在毫秒级；**但「注入的内容是否被模型采用」没有量化验证**，依赖模型本身。
 - 真实 A/B 只测了一个模型、10 个用例、3 次采样，且质量维度尚未人工盲评。
 
 ## 参与

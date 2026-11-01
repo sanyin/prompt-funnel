@@ -140,7 +140,7 @@ docs/            DESIGN / SPEC / USAGE / EVAL / AB-REPORT / EXAMPLE
 - A sentence that both constrains and acts ("rewrite this module in TypeScript") stays whole under Requirements.
 - `refine` accepts eight explicit forms. When it does not understand, it lists them instead of guessing.
 - Continuation is concatenation plus summarisation, not real dialogue understanding; after several turns the "already agreed" block grows and needs trimming.
-- The Claude Code hook is verified at process level; **end-to-end headless was not confirmed** on this machine (`claude -p` times out here). Test it interactively once.
+- The Claude Code hook is provably invoked (a probe captured the real `UserPromptSubmit` payload), and `funnel hook` itself is unit-tested and answers in milliseconds; **whether the model adopts the injected structure is not measured** — that is up to the model.
 - The live A/B covers one model, 10 cases, 3 samples; the quality dimension still needs human blind rating.
 
 ## Contributing
