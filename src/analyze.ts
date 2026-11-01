@@ -278,6 +278,16 @@ interface Gap {
 }
 
 /**
+ * Praise that cannot be checked.
+ *
+ * "有竞争力 / 有新意" is a feeling, not a requirement: the model will happily
+ * produce something that merely *sounds* novel. Ranking this gap first turns an
+ * unanswerable adjective into a choice between concrete axes.
+ */
+const HOLLOW_QUALITY =
+  /(?:新意|新颖|创新|竞争力|亮点|高级感|高大上|有质感|惊艳|爆款|别具一格|与众不同)/u;
+
+/**
  * Answer choices for each gap.
  *
  * A question with no options forces the user to write prose; a question with
@@ -291,6 +301,7 @@ const GAP_OPTIONS: Record<Lang, Record<string, string[]>> = {
     format: ['一段能直接用的文字', '一份清单或表格', '能跑的代码 + 说明', '分步骤的操作指南'],
     acceptance: ['能跑通 / 通过测试', '覆盖所有要求', '500 字以内', '能直接发给别人'],
     stack: ['沿用现有技术栈', 'TypeScript / Node', 'Python', '不确定，你来选'],
+    quality: ['玩法 / 规则上的新', '视觉 / 氛围上的新', '技术实现上的新', '先给我三个方向选'],
   },
   en: {
     audience: ['A complete beginner', 'Someone with basics', 'A domain expert', 'Someone deciding something'],
@@ -298,6 +309,7 @@ const GAP_OPTIONS: Record<Lang, Record<string, string[]>> = {
     format: ['A paragraph I can use as-is', 'A list or table', 'Runnable code + notes', 'Step-by-step instructions'],
     acceptance: ['It runs / tests pass', 'It covers every requirement', 'Under 500 words', 'I can send it to someone'],
     stack: ['The existing stack', 'TypeScript / Node', 'Python', 'Not sure, you pick'],
+    quality: ['New mechanics', 'New look and feel', 'New technical approach', 'Give me three directions first'],
   },
 };
 
@@ -320,6 +332,27 @@ function collectGaps(
       question: content.gaps.audience.question,
       options: GAP_OPTIONS[lang].audience ?? [],
       assumption: { text: content.gaps.audience.assumption, impact: content.gaps.audience.impact },
+    });
+  }
+  if (HOLLOW_QUALITY.test(raw)) {
+    gaps.push({
+      id: 'quality',
+      rank: 0,
+      question:
+        lang === 'zh'
+          ? '「新意 / 竞争力」具体指哪一方面？'
+          : 'What kind of "novel" do you mean?',
+      options: GAP_OPTIONS[lang].quality ?? [],
+      assumption: {
+        text:
+          lang === 'zh'
+            ? '按「玩法 / 规则上的新」理解，先做一个能跑的版本'
+            : 'Novelty in mechanics: one playable version first',
+        impact:
+          lang === 'zh'
+            ? '方向选错，做出来的东西对但不对味'
+            : 'Wrong axis: the thing will be built, and be the wrong kind of new',
+      },
     });
   }
   if (goals >= 2) {

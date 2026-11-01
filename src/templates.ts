@@ -96,6 +96,20 @@ export const TEMPLATES: Record<string, Template> = {
     acceptance: ['每个结论都标明来源或标注为未经证实'],
     questions: ['这份调研用来做什么决定？（决定深度与取舍）'],
   },
+  critique: {
+    id: 'critique',
+    label: '严格评审',
+    description: '先给结论，再给理由；该反对的地方直接反对。',
+    constraints: [
+      '第一句就给结论：可行 / 不可行 / 有条件可行，不要先铺垫',
+      '不同意的地方直接说，不要用「虽然…但是…」把反对意见包装成同意',
+      '不确定的地方说「不确定」，不要用听起来笃定的措辞填空',
+    ],
+    acceptance: [
+      '至少指出一个会让它失败的具体原因',
+      '如果方案本身不成立，第一句就说，然后才给替代方案',
+    ],
+  },
 };
 
 /** Look up a template, falling back to `default` for unknown ids. */

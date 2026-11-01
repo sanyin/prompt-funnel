@@ -78,6 +78,27 @@ You decide: a per-item "打码" button on the web and in the extension, `--redac
 
 Patterns are deliberately narrow: ports, versions, dates, short commit hashes and order numbers are asserted as non-findings. Missing one is better than being the tool that cried wolf.
 
+## Hollow praise becomes a choice
+
+Words like "competitive" or "novel" cannot be verified — a model will hand you something that merely *sounds* new and call it done. So they are pulled out into a question: is the novelty in mechanics, look, or technique — or "give me three directions first"?
+
+Pick an axis and the constraint pins it. Pick the last option and a requirement is added: propose three directions, one line each, wait for a pick.
+
+**The directions come from the model, not from this tool.** The rules engine invents nothing; it only turns "unverifiable" into "decidable".
+
+## If you do not want flattery, make it an acceptance criterion
+
+There is a **"要它说实话"** toggle in the page (template `critique` on the CLI).
+
+It does not add "please do not be sycophantic" — a model satisfies that superficially: one sentence of agreement, a turn, and then the same answer. It adds checkable structure:
+
+- conclusion first: viable / not viable / viable with conditions — no preamble
+- disagree directly; no "although… but…" packaging that turns disagreement into agreement
+- say "I am not sure" where you are not sure
+- name at least one concrete reason this will fail
+
+"Do not flatter" is an attitude. "Conclusion first plus one fatal risk" is an acceptance criterion. Only the second one can be checked, and only the second one changes the output.
+
 ## Four design decisions
 
 **1. A gate, not a gateway.** Most messages are already clear, and rewriting them costs latency, tokens and trust. Clear requests are returned byte-for-byte identical — asserted in tests.

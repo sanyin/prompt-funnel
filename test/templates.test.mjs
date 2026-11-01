@@ -48,3 +48,19 @@ test('an unknown template id falls back to default instead of throwing', () => {
   const unchanged = applyTemplate(spec(), fallback);
   assert.equal(unchanged.constraints.length, spec().constraints.length);
 });
+
+test('the critique template makes disagreement structural, not a slogan', () => {
+  const next = applyTemplate(spec(), getTemplate('critique'));
+  const text = next.constraints.map((item) => item.text).join('\n');
+  assert.match(text, /第一句就给结论/);
+  assert.match(text, /不要用「虽然…但是…」/);
+  const added = next.acceptance.filter((item) => item.text.includes('至少指出一个'));
+  assert.equal(added.length, 1);
+  assert.equal(added[0].source, 'assumption');
+});
+
+test('the critique template does not force an intent, so it composes with anything', () => {
+  const review = analyzeWithRules('帮我看看这个函数写得怎么样');
+  const next = applyTemplate(review, getTemplate('critique'));
+  assert.equal(next.intent, review.intent);
+});

@@ -149,6 +149,9 @@
         <div class="chips" id="samples"></div>
         <div id="secrets"></div>
         <div class="status" id="status"></div>
+        <div class="chips" id="strict-row">
+          <button class="chip" id="strict" aria-pressed="false">☐ 要它说实话（严格评审）</button>
+        </div>
         <div class="answers" id="answers"></div>
         <div class="questions" id="questions"></div>
 
@@ -165,6 +168,7 @@
                 <option value="writing">写作</option>
                 <option value="image-prompt">图像提示词</option>
                 <option value="research">调研</option>
+                <option value="critique">严格评审</option>
               </select>
             </div>
             <div>
@@ -387,6 +391,22 @@
           `保真 ${(rendered.fidelity.retention * 100).toFixed(0)}% · 未溯源 ${rendered.fidelity.unverifiable.length} · ` +
           (errors.length > 0 ? `${errors.length} 个错误` : '校验通过');
       }
+
+      // One visible toggle for the thing most people want but never ask for:
+      // permission to disagree with them.
+      const strictButton = document.getElementById('strict');
+      function syncStrict() {
+        const on = templateSel.value === 'critique';
+        strictButton.textContent = on ? '☑ 要它说实话（严格评审）' : '☐ 要它说实话（严格评审）';
+        strictButton.setAttribute('aria-pressed', on ? 'true' : 'false');
+      }
+      strictButton.addEventListener('click', () => {
+        templateSel.value = templateSel.value === 'critique' ? 'default' : 'critique';
+        syncStrict();
+        render();
+      });
+      templateSel.addEventListener('change', syncStrict);
+      syncStrict();
 
       const copyButton = document.getElementById('copy');
       copyButton.addEventListener('click', async () => {

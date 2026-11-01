@@ -42,6 +42,9 @@ function renumber(requirements: Requirement[]): Requirement[] {
   return requirements.map((requirement, index) => ({ ...requirement, id: `R${index + 1}` }));
 }
 
+/** The option that asks the model to propose directions instead of committing. */
+const ASK_FOR_OPTIONS = /^(?:先给我三个方向选|Give me three directions first)$/u;
+
 /**
  * Fold one answer into the spec.
  *
@@ -77,6 +80,18 @@ export function answerQuestion(spec: PromptSpec, id: string, answer: string): Pr
       break;
     case 'acceptance':
       next.acceptance.push(item);
+      break;
+    case 'quality':
+      // "Make it novel" cannot be verified. Either pin the axis, or ask the model
+      // to propose directions before it starts building — never both.
+      if (ASK_FOR_OPTIONS.test(text)) {
+        next.requirements = renumber([
+          ...next.requirements,
+          { id: 'R?', text: '先给 3 个方向，各一句话说明取舍，等我选定再展开', source: 'user' },
+        ]);
+      } else {
+        next.constraints.push({ text: `「新意 / 竞争力」的落点：${text}`, source: 'user' });
+      }
       break;
     case 'scope':
       // Scope choices narrow the work; they belong with the constraints, not the

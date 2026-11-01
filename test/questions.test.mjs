@@ -78,3 +78,29 @@ test('english input gets english questions and options', () => {
   assert.match(questions[0].question, /[A-Za-z]/);
   assert.ok(questions[0].options.some((option) => /[A-Za-z]/.test(option)));
 });
+
+test('hollow praise words are turned into a decidable question, ranked first', () => {
+  const spec = analyzeWithRules('我想做一个像素小游戏，要有新意，有竞争力');
+  const questions = questionsFor(spec);
+  assert.equal(questions[0].id, 'quality');
+  assert.ok(questions[0].options.length >= 4);
+});
+
+test('picking an axis pins the novelty instead of leaving it to the model', () => {
+  const spec = analyzeWithRules('要有新意，有竞争力');
+  const next = answerQuestion(spec, 'quality', '视觉 / 氛围上的新');
+  assert.ok(next.constraints.some((item) => item.text.includes('视觉 / 氛围上的新')));
+  assert.equal(questionsFor(next).length, questionsFor(spec).length - 1);
+});
+
+test('asking for directions becomes a requirement, not a constraint', () => {
+  const spec = analyzeWithRules('要有新意，有竞争力');
+  const next = answerQuestion(spec, 'quality', '先给我三个方向选');
+  assert.ok(next.requirements.some((item) => item.text.includes('先给 3 个方向')));
+  assert.ok(!next.constraints.some((item) => item.text.includes('先给 3 个方向')));
+});
+
+test('a request without hollow praise gets no quality question', () => {
+  const spec = analyzeWithRules('把 src/app.ts 的并发从 4 改成 8');
+  assert.ok(!questionsFor(spec).some((question) => question.id === 'quality'));
+});
