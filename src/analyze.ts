@@ -273,8 +273,33 @@ interface Gap {
   id: string;
   rank: number;
   question: string;
+  options: string[];
   assumption: Assumption;
 }
+
+/**
+ * Answer choices for each gap.
+ *
+ * A question with no options forces the user to write prose; a question with
+ * three concrete options gets answered. These are the shapes people actually
+ * pick, not a taxonomy.
+ */
+const GAP_OPTIONS: Record<Lang, Record<string, string[]>> = {
+  zh: {
+    audience: ['完全的新手', '有基础的人', '领域专家', '要拿去做决定的人'],
+    scope: ['一次全做', '先做第一件', '按顺序，做完一件再确认'],
+    format: ['一段能直接用的文字', '一份清单或表格', '能跑的代码 + 说明', '分步骤的操作指南'],
+    acceptance: ['能跑通 / 通过测试', '覆盖所有要求', '500 字以内', '能直接发给别人'],
+    stack: ['沿用现有技术栈', 'TypeScript / Node', 'Python', '不确定，你来选'],
+  },
+  en: {
+    audience: ['A complete beginner', 'Someone with basics', 'A domain expert', 'Someone deciding something'],
+    scope: ['All at once', 'The first one only', 'In order, confirm after each'],
+    format: ['A paragraph I can use as-is', 'A list or table', 'Runnable code + notes', 'Step-by-step instructions'],
+    acceptance: ['It runs / tests pass', 'It covers every requirement', 'Under 500 words', 'I can send it to someone'],
+    stack: ['The existing stack', 'TypeScript / Node', 'Python', 'Not sure, you pick'],
+  },
+};
 
 function collectGaps(
   intent: IntentClass,
@@ -293,6 +318,7 @@ function collectGaps(
       id: 'audience',
       rank: 1,
       question: content.gaps.audience.question,
+      options: GAP_OPTIONS[lang].audience ?? [],
       assumption: { text: content.gaps.audience.assumption, impact: content.gaps.audience.impact },
     });
   }
@@ -301,6 +327,7 @@ function collectGaps(
       id: 'scope',
       rank: 1,
       question: content.gaps.scope.question,
+      options: GAP_OPTIONS[lang].scope ?? [],
       assumption: { text: content.gaps.scope.assumption, impact: content.gaps.scope.impact },
     });
   }
@@ -309,6 +336,7 @@ function collectGaps(
       id: 'format',
       rank: 2,
       question: content.gaps.format.question,
+      options: GAP_OPTIONS[lang].format ?? [],
       assumption: { text: defaultDeliverable(intent, lang), impact: content.gaps.format.impact },
     });
   }
@@ -317,6 +345,7 @@ function collectGaps(
       id: 'acceptance',
       rank: 2,
       question: content.gaps.acceptance.question,
+      options: GAP_OPTIONS[lang].acceptance ?? [],
       assumption: { text: content.gaps.acceptance.assumption, impact: content.gaps.acceptance.impact },
     });
   }
@@ -328,6 +357,7 @@ function collectGaps(
       id: 'stack',
       rank: 3,
       question: content.gaps.stack.question,
+      options: GAP_OPTIONS[lang].stack ?? [],
       assumption: { text: content.gaps.stack.assumption, impact: content.gaps.stack.impact },
     });
   }
@@ -381,11 +411,18 @@ export function analyzeWithRules(raw: string, gateResult?: GateResult, options: 
   if (audience !== undefined) deliverable.audience = { text: audience, source: 'user' };
 
   const gaps = collectGaps(intent, deliverable, acceptance, result.signals.goals, raw, lang);
-  const openQuestions = gaps
-    .filter((gap) => gap.rank <= 2)
-    .slice(0, 3)
-    .map((gap) => gap.question);
-  const assumptions = gaps.map((gap) => gap.assumption);
+  // Gaps are pushed in rank order, so the first three are the ones worth a
+  // round-trip. Rank decides *priority*, not eligibility: a third-tier gap still
+  // gets asked when nothing more important is missing.
+  const asked = gaps.slice(0, 3);
+  const openQuestions = asked.map((gap) => gap.question);
+  // Only the gaps that were actually asked become answerable in the UI; the rest
+  // stay as silent defaults so the prompt never grows a fourth question.
+  const assumptions = gaps.map((gap) =>
+    asked.includes(gap)
+      ? { ...gap.assumption, gap: { id: gap.id, question: gap.question, options: gap.options } }
+      : gap.assumption,
+  );
 
   if (deliverable.format === undefined) {
     deliverable.format = { text: defaultDeliverable(intent, lang), source: 'inferred' };

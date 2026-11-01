@@ -38,6 +38,12 @@ export interface Requirement extends Item {
 export interface Assumption {
   text: string;
   impact: string;
+  /**
+   * Present when this assumption came from a gap the user can answer directly.
+   * The UI turns these into clickable options; answering replaces the default
+   * instead of asking the user to edit prose.
+   */
+  gap?: { id: string; question: string; options: string[] };
 }
 
 /** A high-risk literal that a rewrite must not invent. */

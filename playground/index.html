@@ -3,7 +3,8 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>prompt-funnel · 收束</title>
+    <title>prompt-funnel · 把话问清楚</title>
+    <meta name="description" content="把要发给 AI 的话粘进来，看看它缺什么，点几下补上，再复制走。" />
     <style>
       :root {
         --bg: #fbfbfa;
@@ -31,140 +32,159 @@
       * { box-sizing: border-box; }
       body {
         margin: 0;
-        padding: 24px;
+        padding: 22px 18px 40px;
         background: var(--bg);
         color: var(--ink);
         font: 15px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
       }
-      header { max-width: 1180px; margin: 0 auto 20px; }
-      h1 { font-size: 20px; margin: 0 0 6px; letter-spacing: -0.01em; }
+      header, main, footer { max-width: 1180px; margin-inline: auto; }
+      h1 { font-size: 19px; margin: 0 0 6px; letter-spacing: -0.01em; }
       .sub { color: var(--muted); font-size: 13px; }
       .sub a { color: inherit; }
       main {
-        max-width: 1180px;
-        margin: 0 auto;
         display: grid;
-        grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr);
-        gap: 18px;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr);
+        gap: 16px;
         align-items: start;
+        margin-top: 18px;
       }
-      @media (max-width: 900px) { main { grid-template-columns: 1fr; } }
+      @media (max-width: 880px) { main { grid-template-columns: 1fr; } }
       section {
         background: var(--panel);
         border: 1px solid var(--line);
-        border-radius: 12px;
+        border-radius: 14px;
         padding: 16px;
       }
       label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 8px; letter-spacing: 0.04em; }
       textarea {
         width: 100%;
-        min-height: 150px;
+        min-height: 132px;
         resize: vertical;
         padding: 12px;
-        border-radius: 8px;
+        border-radius: 10px;
         border: 1px solid var(--line);
         background: var(--bg);
         color: var(--ink);
         font: inherit;
       }
       textarea:focus, select:focus, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
-      .row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; align-items: center; }
-      button, select {
-        font: inherit;
-        font-size: 13px;
-        padding: 6px 12px;
-        border-radius: 7px;
-        border: 1px solid var(--line);
-        background: var(--bg);
-        color: var(--ink);
-        cursor: pointer;
-      }
-      button:hover { border-color: var(--accent); }
-      button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
-      @media (prefers-color-scheme: dark) { button.primary { color: #10120f; } }
       .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
-      .chip { font-size: 12px; padding: 4px 10px; border-radius: 999px; border: 1px dashed var(--line); background: transparent; color: var(--muted); cursor: pointer; }
+      .chip {
+        font-size: 12px; padding: 4px 10px; border-radius: 999px;
+        border: 1px dashed var(--line); background: transparent; color: var(--muted); cursor: pointer;
+      }
       .chip:hover { color: var(--ink); border-color: var(--accent); }
-      .verdict { display: flex; align-items: baseline; gap: 10px; margin-bottom: 4px; }
-      .badge { font-family: var(--mono); font-size: 12px; padding: 2px 8px; border-radius: 6px; }
-      .badge.pass { background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--accent); }
-      .badge.compile { background: color-mix(in srgb, var(--warn) 20%, transparent); color: var(--warn); }
-      .score { font-family: var(--mono); color: var(--muted); font-size: 12px; }
-      .axes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px 12px; margin: 12px 0 4px; }
-      .axis { font-size: 11px; color: var(--muted); }
+      .status { margin-top: 14px; font-size: 13px; }
+      .status b { font-weight: 600; }
+      .status.ok { color: var(--accent); }
+      .status.todo { color: var(--warn); }
+      .questions { margin-top: 12px; display: grid; gap: 10px; }
+      .q { border: 1px solid var(--line); border-radius: 10px; padding: 12px; background: var(--bg); }
+      .q-title { font-size: 13.5px; margin-bottom: 10px; }
+      .q-options { display: flex; flex-wrap: wrap; gap: 6px; }
+      .q-options button {
+        font: inherit; font-size: 12.5px; padding: 5px 11px; border-radius: 8px;
+        border: 1px solid var(--line); background: var(--panel); color: var(--ink); cursor: pointer;
+      }
+      .q-options button:hover { border-color: var(--accent); color: var(--accent); }
+      .q-foot { margin-top: 9px; font-size: 11.5px; color: var(--muted); }
+      .answers { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+      .answer {
+        display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px;
+        padding: 4px 6px 4px 10px; border-radius: 8px;
+        background: color-mix(in srgb, var(--accent) 12%, transparent); color: var(--accent);
+      }
+      .answer button { border: 0; background: none; color: inherit; cursor: pointer; font-size: 14px; line-height: 1; padding: 0 2px; }
+      .result-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+      .result-head span { font-size: 12px; color: var(--muted); }
+      button.primary {
+        font: inherit; font-size: 13.5px; padding: 7px 16px; border-radius: 9px;
+        border: 1px solid var(--accent); background: var(--accent); color: #fff; cursor: pointer;
+      }
+      @media (prefers-color-scheme: dark) { button.primary { color: #10120f; } }
+      button.primary.copied { background: transparent; color: var(--accent); }
+      pre {
+        margin: 0; padding: 14px; border-radius: 10px; border: 1px solid var(--line);
+        background: var(--bg); font-family: var(--mono); font-size: 12.5px; line-height: 1.6;
+        white-space: pre-wrap; word-break: break-word; max-height: 52vh; overflow: auto;
+      }
+      .empty { color: var(--muted); font-size: 13px; padding: 26px 0; text-align: center; }
+      details.advanced { margin-top: 16px; border-top: 1px dashed var(--line); padding-top: 12px; }
+      details.advanced summary { cursor: pointer; font-size: 12.5px; color: var(--muted); }
+      details.advanced summary:hover { color: var(--ink); }
+      .adv-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-top: 12px; }
+      .adv-grid label { margin-bottom: 4px; }
+      select {
+        font: inherit; font-size: 12.5px; padding: 5px 8px; border-radius: 8px;
+        border: 1px solid var(--line); background: var(--bg); color: var(--ink); width: 100%;
+      }
+      .axes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px 12px; margin-top: 14px; font-size: 11px; color: var(--muted); }
       .bar { height: 4px; border-radius: 2px; background: var(--line); margin-top: 3px; overflow: hidden; }
       .bar > i { display: block; height: 100%; background: var(--accent); }
-      .reasons { margin: 10px 0 0; padding-left: 16px; color: var(--muted); font-size: 12.5px; }
-      pre {
-        margin: 0;
-        padding: 14px;
-        border-radius: 8px;
-        border: 1px solid var(--line);
-        background: var(--bg);
-        font-family: var(--mono);
-        font-size: 12.5px;
-        line-height: 1.55;
-        white-space: pre-wrap;
-        word-break: break-word;
-        max-height: 46vh;
-        overflow: auto;
-      }
-      .meta { margin-top: 10px; font-size: 12px; color: var(--muted); font-family: var(--mono); }
-      .meta .bad { color: var(--bad); }
-      .assume { margin-top: 14px; border-top: 1px dashed var(--line); padding-top: 12px; }
-      .assume h2 { font-size: 12.5px; margin: 0 0 8px; color: var(--warn); font-weight: 600; letter-spacing: 0.02em; }
-      .assume ul { margin: 0; padding-left: 18px; }
-      .assume li { font-size: 13px; margin-bottom: 6px; }
-      .assume li span { display: block; color: var(--muted); font-size: 12px; }
-      .assume .foot { margin-top: 8px; font-size: 12px; color: var(--muted); }
-      footer { max-width: 1180px; margin: 22px auto 0; color: var(--muted); font-size: 12px; }
-      .empty { color: var(--muted); font-size: 13px; padding: 20px 0; text-align: center; }
+      .spec { margin-top: 12px; }
+      .spec pre { max-height: 260px; font-size: 11.5px; }
+      footer { margin-top: 18px; color: var(--muted); font-size: 12px; }
     </style>
   </head>
   <body>
     <header>
-      <h1>prompt-funnel · 收束</h1>
+      <h1>prompt-funnel · 把话问清楚</h1>
       <div class="sub">
-        在请求进入模型之前，把缺失的信息显式化。全部在这个页面里跑，不发任何网络请求。
+        把你要发给 AI 的话粘进来，它会告诉你这句话缺什么，点几下补上，再复制走。全部在本机完成，不联网。
         <a href="https://github.com/sanyin/prompt-funnel">源码</a>
       </div>
     </header>
 
     <main>
       <section>
-        <label for="input">你的原始请求</label>
+        <label for="input">你要发给 AI 的话</label>
         <textarea id="input" spellcheck="false" placeholder="例如：帮我优化一下这个东西"></textarea>
         <div class="chips" id="samples"></div>
-        <div class="row">
-          <select id="template" aria-label="模板">
-            <option value="default">模板：通用</option>
-            <option value="code-review">代码评审</option>
-            <option value="debug">排障</option>
-            <option value="data-analysis">数据分析</option>
-            <option value="writing">写作</option>
-            <option value="image-prompt">图像提示词</option>
-            <option value="research">调研</option>
-          </select>
-          <select id="style" aria-label="排版">
-            <option value="bluf">分节（默认）</option>
-            <option value="compact">紧凑</option>
-            <option value="checklist">勾选清单</option>
-          </select>
-          <button id="copy">复制结果</button>
-        </div>
-        <div id="gate"></div>
-        <div id="assume"></div>
+        <div class="status" id="status"></div>
+        <div class="answers" id="answers"></div>
+        <div class="questions" id="questions"></div>
+
+        <details class="advanced">
+          <summary>高级</summary>
+          <div class="adv-grid">
+            <div>
+              <label for="template">模板</label>
+              <select id="template">
+                <option value="default">通用</option>
+                <option value="code-review">代码评审</option>
+                <option value="debug">排障</option>
+                <option value="data-analysis">数据分析</option>
+                <option value="writing">写作</option>
+                <option value="image-prompt">图像提示词</option>
+                <option value="research">调研</option>
+              </select>
+            </div>
+            <div>
+              <label for="style">排版</label>
+              <select id="style">
+                <option value="bluf">分节</option>
+                <option value="compact">紧凑</option>
+                <option value="checklist">勾选清单</option>
+              </select>
+            </div>
+          </div>
+          <div class="axes" id="axes"></div>
+          <div class="spec"><pre id="spec"></pre></div>
+          <div class="meta" id="fidelity"></div>
+        </details>
       </section>
 
       <section>
-        <label>收束结果</label>
+        <div class="result-head">
+          <span id="count">收束后的版本</span>
+          <button class="primary" id="copy">复制</button>
+        </div>
         <pre id="out" aria-live="polite"></pre>
-        <div class="meta" id="fidelity"></div>
       </section>
     </main>
 
     <footer>
-      闸门判定与收束都在本地完成；同一份内核也跑在 CLI 和 MCP server 里。
+      判断和生成都在本地完成；同一份内核也跑在 CLI 和 MCP server 里。
     </footer>
 
     <script type="module">
@@ -172,13 +192,22 @@
       import { analyzeWithRules } from './dist/analyze.js';
       import { renderSpec } from './dist/render.js';
       import { applyTemplate, getTemplate } from './dist/templates.js';
+      import { answerQuestion, questionsFor } from './dist/questions.js';
 
       const input = document.getElementById('input');
-      const gateBox = document.getElementById('gate');
+      const statusEl = document.getElementById('status');
+      const questionsEl = document.getElementById('questions');
+      const answersEl = document.getElementById('answers');
       const out = document.getElementById('out');
-      const meta = document.getElementById('fidelity');
-      const style = document.getElementById('style');
-      const template = document.getElementById('template');
+      const count = document.getElementById('count');
+      const axesEl = document.getElementById('axes');
+      const specEl = document.getElementById('spec');
+      const fidelityEl = document.getElementById('fidelity');
+      const styleSel = document.getElementById('style');
+      const templateSel = document.getElementById('template');
+
+      /** Chosen answers, keyed by gap id. Re-applied on every keystroke. */
+      const answers = new Map();
 
       const AXIS_LABEL = {
         goal: '目标',
@@ -192,119 +221,157 @@
       const SAMPLES = [
         '帮我优化一下这个东西',
         '帮我写个爬虫，顺便加个代理池，再做个面板',
-        '1. 支持断点续传\n2. 失败重试 3 次\n3. 导出 CSV',
+        '写一篇关于向量数据库的科普文章',
         'make it better',
-        '这段代码为什么报 TypeError: x is not a function？',
       ];
 
-      const samples = document.getElementById('samples');
+      const samplesEl = document.getElementById('samples');
       for (const sample of SAMPLES) {
         const chip = document.createElement('button');
         chip.className = 'chip';
-        chip.textContent = sample.replace(/\n/g, ' / ').slice(0, 22) + (sample.length > 22 ? '…' : '');
+        chip.textContent = sample.length > 18 ? `${sample.slice(0, 18)}…` : sample;
+        chip.title = sample;
         chip.addEventListener('click', () => {
           input.value = sample;
+          answers.clear();
           render();
         });
-        samples.append(chip);
+        samplesEl.append(chip);
       }
 
       let timer;
-      const schedule = () => {
+      input.addEventListener('input', () => {
         clearTimeout(timer);
-        timer = setTimeout(render, 120);
-      };
-
-      function renderGate(verdict) {
-        const rows = Object.entries(verdict.axes)
-          .map(
-            ([key, value]) =>
-              `<div class="axis">${AXIS_LABEL[key] ?? key} ${value.toFixed(2)}<div class="bar"><i style="width:${Math.round(value * 100)}%"></i></div></div>`,
-          )
-          .join('');
-        const reasons = verdict.reasons.map((reason) => `<li>${escapeHtml(reason)}</li>`).join('');
-        gateBox.innerHTML = `
-          <div class="verdict">
-            <span class="badge ${verdict.decision}">${verdict.decision === 'pass' ? '放行' : '收束'}</span>
-            <span class="score">清晰度 ${verdict.score.toFixed(2)} · 意图 ${verdict.signals.intent} · ${verdict.signals.tokens} tokens</span>
-          </div>
-          <div class="axes">${rows}</div>
-          <ul class="reasons">${reasons}</ul>`;
-      }
+        timer = setTimeout(render, 100);
+      });
+      styleSel.addEventListener('change', render);
+      templateSel.addEventListener('change', render);
 
       function escapeHtml(value) {
-        return String(value).replace(/[&<>"]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[char]);
+        return String(value).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
       }
 
-      function renderAssumptions(spec) {
-        const box = document.getElementById('assume');
-        if (spec === null || spec.assumptions.length === 0) {
-          box.innerHTML = '';
-          return;
+      function renderQuestions(questions) {
+        questionsEl.innerHTML = '';
+        for (const question of questions) {
+          const card = document.createElement('div');
+          card.className = 'q';
+          const options = question.options
+            .map((option) => `<button data-id="${escapeHtml(question.id)}" data-value="${escapeHtml(option)}">${escapeHtml(option)}</button>`)
+            .join('');
+          card.innerHTML = `
+            <div class="q-title">${escapeHtml(question.question)}</div>
+            <div class="q-options">${options}</div>
+            <div class="q-foot">不选的话，会默认「${escapeHtml(question.assumption.text)}」。</div>`;
+          questionsEl.append(card);
         }
-        const items = spec.assumptions
-          .map(
-            (item) =>
-              `<li>${escapeHtml(item.text)}<span>若不符：${escapeHtml(item.impact)}</span></li>`,
-          )
-          .join('');
-        box.innerHTML = `
-          <div class="assume">
-            <h2>直接发，模型会替你决定这些</h2>
-            <ul>${items}</ul>
-            <div class="foot">这是这条输入里真实缺的信息——不是模板套话。猜错的部分它不会告诉你，只会照猜的写下去。</div>
-          </div>`;
+        questionsEl.querySelectorAll('button[data-id]').forEach((button) => {
+          button.addEventListener('click', () => {
+            answers.set(button.dataset.id, button.dataset.value);
+            render();
+          });
+        });
+      }
+
+      function renderAnswers(applied) {
+        answersEl.innerHTML = '';
+        for (const [id, value] of applied) {
+          const pill = document.createElement('span');
+          pill.className = 'answer';
+          pill.innerHTML = `${escapeHtml(value)}<button title="撤销">×</button>`;
+          pill.querySelector('button').addEventListener('click', () => {
+            answers.delete(id);
+            render();
+          });
+          answersEl.append(pill);
+        }
       }
 
       function render() {
         const text = input.value.trim();
+        answersEl.innerHTML = '';
+        questionsEl.innerHTML = '';
+
         if (text.length === 0) {
-          gateBox.innerHTML = '<div class="empty">输入一句话试试</div>';
-          document.getElementById('assume').innerHTML = '';
+          statusEl.textContent = '粘一句话进来试试。';
+          statusEl.className = 'status';
           out.textContent = '';
-          meta.textContent = '';
+          count.textContent = '收束后的版本';
+          axesEl.innerHTML = '';
+          specEl.textContent = '';
+          fidelityEl.textContent = '';
           return;
         }
 
         const verdict = gate(text);
-        renderGate(verdict);
-
         const base = analyzeWithRules(text, verdict);
-        const chosen = getTemplate(template.value);
-        const spec = chosen.id === 'default' ? base : applyTemplate(base, chosen);
-        // Only meaningful when the request would actually be compiled: a clear
-        // request is sent as-is, so listing assumptions there would be noise.
-        renderAssumptions(verdict.decision === 'compile' ? spec : null);
-        const rendered = renderSpec(spec, { style: style.value });
-        out.textContent = rendered.text.trimEnd();
+        let spec = base;
+        for (const [id, value] of answers) spec = answerQuestion(spec, id, value);
 
+        const chosen = getTemplate(templateSel.value);
+        if (chosen.id !== 'default') spec = applyTemplate(spec, chosen);
+
+        const questions = verdict.decision === 'pass' ? [] : questionsFor(spec);
+        const remaining = new Set(questions.map((question) => question.id));
+        const applied = [...answers].filter(([id]) => !remaining.has(id));
+        renderAnswers(verdict.decision === 'pass' ? [] : applied);
+        renderQuestions(questions);
+
+        const rendered = renderSpec(spec, { style: styleSel.value });
+        // A clear request is sent byte-for-byte; showing a compiled version here
+        // would contradict the status line right above it.
+        out.textContent = verdict.decision === 'pass' ? text : rendered.text.trimEnd();
+        count.textContent =
+          verdict.decision === 'pass' ? '原样发送 · 未改写' : `收束后 ${rendered.text.length} 字`;
+
+        if (verdict.decision === 'pass') {
+          statusEl.className = 'status ok';
+          statusEl.innerHTML = '<b>这句话已经够清楚了</b>，原样发就行，不用改。';
+        } else if (questions.length > 0) {
+          statusEl.className = 'status todo';
+          statusEl.innerHTML = `<b>还缺 ${questions.length} 件事</b>。不问的话，模型会替你决定——选一下，或者直接复制下面的版本。`;
+        } else {
+          statusEl.className = 'status ok';
+          statusEl.innerHTML = '<b>补齐了</b>。下面这一版可以复制走了。';
+        }
+
+        axesEl.innerHTML = Object.entries(verdict.axes)
+          .map(
+            ([key, value]) =>
+              `<div>${AXIS_LABEL[key] ?? key} ${value.toFixed(2)}<div class="bar"><i style="width:${Math.round(value * 100)}%"></i></div></div>`,
+          )
+          .join('');
+        specEl.textContent = JSON.stringify(spec, null, 2);
         const errors = rendered.fidelity.issues.filter((issue) => issue.severity === 'error');
-        const retention = (rendered.fidelity.retention * 100).toFixed(0);
-        const templateNote = chosen.id === 'default' ? '' : ` · 模板 ${chosen.label}`;
-        meta.innerHTML = `保真 ${retention}% · 未溯源 ${rendered.fidelity.unverifiable.length}${templateNote} · ` +
-          (errors.length > 0
-            ? `<span class="bad">${errors.length} 个错误</span>`
-            : `<span>校验通过</span>`);
+        fidelityEl.textContent =
+          `保真 ${(rendered.fidelity.retention * 100).toFixed(0)}% · 未溯源 ${rendered.fidelity.unverifiable.length} · ` +
+          (errors.length > 0 ? `${errors.length} 个错误` : '校验通过');
       }
 
-      input.addEventListener('input', schedule);
-      style.addEventListener('change', render);
-      template.addEventListener('change', render);
-
-      document.getElementById('copy').addEventListener('click', async () => {
+      const copyButton = document.getElementById('copy');
+      copyButton.addEventListener('click', async () => {
+        const text = out.textContent ?? '';
+        if (text.length === 0) return;
         try {
-          await navigator.clipboard.writeText(out.textContent ?? '');
+          await navigator.clipboard.writeText(text);
         } catch {
           const range = document.createRange();
           range.selectNodeContents(out);
           const selection = window.getSelection();
           selection.removeAllRanges();
           selection.addRange(range);
+          document.execCommand?.('copy');
         }
+        const previous = copyButton.textContent;
+        copyButton.textContent = '已复制';
+        copyButton.classList.add('copied');
+        setTimeout(() => {
+          copyButton.textContent = previous;
+          copyButton.classList.remove('copied');
+        }, 1500);
       });
 
       render();
     </script>
   </body>
 </html>
-
