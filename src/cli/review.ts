@@ -91,13 +91,68 @@ function fidelityLine(spec: PromptSpec, text: string): string {
   return [tone(head), ...details].join('\n');
 }
 
+/**
+ * Split an `$EDITOR`-style command into a program and its leading arguments.
+ *
+ * `EDITOR="code --wait"` and `EDITOR="C:\Program Files\...\editor.exe"` are both
+ * common, and `spawnSync` takes them as two different things. Naive whitespace
+ * splitting breaks the second, so quotes are honored.
+ */
+export function splitCommand(value: string): string[] {
+  const parts: string[] = [];
+  let current = '';
+  let quote: '"' | "'" | null = null;
+
+  for (const char of value) {
+    if (quote !== null) {
+      if (char === quote) quote = null;
+      else current += char;
+      continue;
+    }
+    if (char === '"' || char === "'") {
+      quote = char;
+      continue;
+    }
+    if (char === ' ' || char === '\t') {
+      if (current.length > 0) {
+        parts.push(current);
+        current = '';
+      }
+      continue;
+    }
+    current += char;
+  }
+  if (current.length > 0) parts.push(current);
+  return parts;
+}
+
+function launchEditor(editor: string, file: string): boolean {
+  const [command, ...leading] = splitCommand(editor);
+  if (command === undefined) return false;
+  // .cmd/.bat shims (VS Code, Sublime) are not executables; Windows needs a shell.
+  const needsShell = process.platform === 'win32' && /\.(?:cmd|bat)$/iu.test(command);
+  const result = spawnSync(command, [...leading, file], { stdio: 'inherit', shell: needsShell });
+  return result.error === undefined;
+}
+
 function openEditor(content: string): string {
   const file = join(tmpdir(), `funnel-review-${Date.now()}.md`);
   writeFileSync(file, content, 'utf8');
   const editor =
     process.env['VISUAL'] ?? process.env['EDITOR'] ?? (process.platform === 'win32' ? 'notepad' : 'vi');
   note(paint.dim(`打开编辑器：${editor}（保存并关闭后继续）`));
-  spawnSync(editor, [file], { stdio: 'inherit' });
+
+  let opened = launchEditor(editor, file);
+  if (!opened && process.platform === 'win32') {
+    note(paint.yellow(`启动 ${editor} 失败，改用记事本`));
+    opened = launchEditor('notepad', file);
+  }
+  if (!opened) {
+    note(paint.yellow('没有可用的编辑器；请设置 $EDITOR。本次忽略编辑。'));
+    rmSync(file, { force: true });
+    return content;
+  }
+
   const edited = readFileSync(file, 'utf8');
   rmSync(file, { force: true });
   return edited;

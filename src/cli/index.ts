@@ -158,13 +158,19 @@ function commandRender(args: Args): number {
   let spec: PromptSpec | undefined;
   if (file !== undefined) {
     const parsed: unknown = JSON.parse(readFileSync(resolve(file), 'utf8'));
-    const base = loadSpec() ?? (parsed as PromptSpec);
-    spec = coerceSpec(parsed, base as PromptSpec);
+    // The file is its own base. Borrowing `.funnel/last.json` here would attach
+    // an unrelated request's source text and silently validate against it.
+    spec = coerceSpec(parsed, parsed as PromptSpec);
   } else {
     spec = loadSpec();
   }
   if (spec === undefined) {
     note(paint.red('找不到 spec。先运行 funnel compile，或传入 spec.json 路径'));
+    return 2;
+  }
+  if (spec.meta === undefined || typeof spec.meta.source !== 'string') {
+    note(paint.red('spec 缺少 meta.source，无法与原文比对做保真校验。'));
+    note(paint.dim('先运行一次 funnel compile（它会写入 .funnel/last.json），或在 spec 里补上 meta.source。'));
     return 2;
   }
   const issues = validateSpec(spec);
