@@ -8,7 +8,7 @@
 
 > 在请求进入模型之前，把缺失的信息显式化。该问的就问，猜的就标出来，编的一律拦掉。
 
-[English](./README.en.md) · [设计说明](./docs/DESIGN.md) · [用法](./docs/USAGE.md) · [实测](./docs/AB-REPORT.md)
+[English](./README.en.md) · [设计书](./docs/BRIEF.md) · [设计说明](./docs/DESIGN.md) · [用法](./docs/USAGE.md) · [实测](./docs/AB-REPORT.md)
 
 ![playground](docs/assets/playground.png)
 
@@ -192,7 +192,7 @@ playground/      单页问答器：浏览器里直接跑同一份内核
 extension/       Chromium MV3 扩展：从 dist/ 直接 import 内核，无权限申请
 adapters/        Codex / DSH / Claude Code 的 skill、安装脚本与配置说明
 evals/           16 条离线用例 + 真实模型 A/B harness + 成本测量
-docs/            DESIGN / SPEC / USAGE / EVAL / AB-REPORT / COST / EXAMPLE
+docs/            BRIEF（设计书）/ DESIGN / SPEC / USAGE / EVAL / AB-REPORT / COST / EXAMPLE
 ```
 
 ## 已知局限
