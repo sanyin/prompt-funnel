@@ -31,6 +31,9 @@ interface Labels {
   original: string;
   assumed: string;
   defaults: string;
+  ifWrong: string;
+  colon: string;
+  separator: string;
 }
 
 const LABELS: Record<Lang, Labels> = {
@@ -49,6 +52,9 @@ const LABELS: Record<Lang, Labels> = {
     original: '原文（与上文冲突时以此为准）',
     assumed: '假定',
     defaults: '以下条目未确认，按默认假设处理',
+    ifWrong: '若不符',
+    colon: '：',
+    separator: '；',
   },
   en: {
     objective: 'Objective',
@@ -65,136 +71,115 @@ const LABELS: Record<Lang, Labels> = {
     original: 'Original request (authoritative if it conflicts)',
     assumed: 'assumed',
     defaults: 'Unconfirmed items are handled with these defaults',
+    ifWrong: 'If not',
+    colon: ': ',
+    separator: '; ',
   },
 };
+
+/** `label + value`, with the separator the language actually uses. */
+const kv = (label: string, value: string, labels: Labels): string => `${label}${labels.colon}${value}`;
 
 /** Append a provenance marker to anything the user did not literally write. */
 function itemText(item: Item, labels: Labels): string {
   if (item.source === 'user') return item.text;
-  return `${item.text}（${labels.assumed}）`;
+  return labels.colon === '：' ? `${item.text}（${labels.assumed}）` : `${item.text} (${labels.assumed})`;
 }
 
 /** Render one item as a markdown line, keeping multi-line content intact. */
-function line(item: Item, labels: Labels, prefix = ''): string {
-  const text = itemText(item, labels).replace(/\n/gu, '\n  ');
-  return `${prefix}${text}`;
+function line(item: Item, labels: Labels): string {
+  return itemText(item, labels).replace(/\n/gu, '\n  ');
 }
 
 function section(heading: string, body: string[]): string[] {
-  if (body.length === 0) return [];
-  return [`## ${heading}`, '', ...body, ''];
+  return body.length === 0 ? [] : [`## ${heading}`, '', ...body, ''];
+}
+
+/** The default assumptions block, shared by every style. */
+function assumptionBody(spec: PromptSpec, labels: Labels): string[] {
+  const block: string[] = [];
+  if (spec.openQuestions.length > 0) {
+    block.push(`_${labels.defaults}${labels.colon}_`, '');
+    spec.openQuestions.forEach((question, index) => block.push(`${index + 1}. ${question}`));
+    block.push('');
+  }
+  if (spec.assumptions.length > 0) {
+    block.push(`**${labels.assumed}**`, '');
+    for (const assumption of spec.assumptions) {
+      block.push(`- ${assumption.text} —— ${kv(labels.ifWrong, assumption.impact, labels)}`);
+    }
+  }
+  return block;
+}
+
+function deliverableLines(spec: PromptSpec, labels: Labels): string[] {
+  const out: string[] = [];
+  if (spec.deliverable.format !== undefined) out.push(`- ${kv(labels.format, itemText(spec.deliverable.format, labels), labels)}`);
+  if (spec.deliverable.length !== undefined) out.push(`- ${kv(labels.length, itemText(spec.deliverable.length, labels), labels)}`);
+  if (spec.deliverable.audience !== undefined) out.push(`- ${kv(labels.audience, itemText(spec.deliverable.audience, labels), labels)}`);
+  return out;
 }
 
 /** `bluf`: the fully structured 总-分-总 rendering. */
 function renderBluf(spec: PromptSpec, labels: Labels): string[] {
-  const out: string[] = [];
+  const out: string[] = [`## ${labels.objective}`, '', itemText(spec.objective, labels), ''];
 
-  out.push(`## ${labels.objective}`, '', itemText(spec.objective, labels), '');
-
-  out.push(
-    ...section(
-      labels.context,
-      spec.context.map((item) => `- ${line(item, labels)}`),
-    ),
-  );
+  out.push(...section(labels.context, spec.context.map((item) => `- ${line(item, labels)}`)));
 
   if (spec.requirements.length > 0) {
     out.push(`## ${labels.requirements}`, '');
-    spec.requirements.forEach((requirement, index) => {
-      out.push(`${index + 1}. ${line(requirement, labels)}`);
-    });
+    spec.requirements.forEach((requirement, index) => out.push(`${index + 1}. ${line(requirement, labels)}`));
     out.push('');
   }
 
   out.push(
-    ...section(
-      labels.constraints,
-      spec.constraints.map((item) => `- ${line(item, labels)}`),
-    ),
-    ...section(
-      labels.nonGoals,
-      spec.nonGoals.map((item) => `- ${line(item, labels)}`),
-    ),
-  );
-
-  const deliverable: string[] = [];
-  if (spec.deliverable.format !== undefined) {
-    deliverable.push(`- ${labels.format}：${itemText(spec.deliverable.format, labels)}`);
-  }
-  if (spec.deliverable.length !== undefined) {
-    deliverable.push(`- ${labels.length}：${itemText(spec.deliverable.length, labels)}`);
-  }
-  if (spec.deliverable.audience !== undefined) {
-    deliverable.push(`- ${labels.audience}：${itemText(spec.deliverable.audience, labels)}`);
-  }
-  out.push(...section(labels.deliverable, deliverable));
-
-  out.push(
-    ...section(
-      labels.acceptance,
-      spec.acceptance.map((item) => `- [ ] ${line(item, labels)}`),
-    ),
+    ...section(labels.constraints, spec.constraints.map((item) => `- ${line(item, labels)}`)),
+    ...section(labels.nonGoals, spec.nonGoals.map((item) => `- ${line(item, labels)}`)),
+    ...section(labels.deliverable, deliverableLines(spec, labels)),
+    ...section(labels.acceptance, spec.acceptance.map((item) => `- [ ] ${line(item, labels)}`)),
   );
 
   if (spec.openQuestions.length > 0 || spec.assumptions.length > 0) {
-    const block: string[] = [];
-    if (spec.openQuestions.length > 0) {
-      block.push(`_${labels.defaults}：_`, '');
-      spec.openQuestions.forEach((question, index) => block.push(`${index + 1}. ${question}`));
-      block.push('');
-    }
-    if (spec.assumptions.length > 0) {
-      block.push(`**${labels.assumed}**`, '');
-      for (const assumption of spec.assumptions) {
-        block.push(`- ${assumption.text} —— 若不符：${assumption.impact}`);
-      }
-    }
-    out.push(...section(labels.questions, block));
+    out.push(...section(labels.questions, assumptionBody(spec, labels)));
   }
-
   return out;
 }
 
 /** `compact`: for short requests where headers would outweigh the content. */
 function renderCompact(spec: PromptSpec, labels: Labels): string[] {
-  const out: string[] = [];
-  out.push(`**${labels.objective}**：${itemText(spec.objective, labels)}`);
+  const out: string[] = [`**${labels.objective}**${labels.colon}${itemText(spec.objective, labels)}`];
+  const bullet = (heading: string, values: string[]): void => {
+    if (values.length > 0) out.push(`**${heading}**${labels.colon}${values.join(labels.separator)}`);
+  };
 
-  if (spec.requirements.length > 0) {
-    const numbered = spec.requirements.map((requirement, index) => `${index + 1}) ${line(requirement, labels)}`);
-    out.push(`**${labels.requirements}**：${numbered.join('；')}`);
-  }
-  if (spec.constraints.length > 0) {
-    out.push(`**${labels.constraints}**：${spec.constraints.map((item) => line(item, labels)).join('；')}`);
-  }
-  if (spec.nonGoals.length > 0) {
-    out.push(`**${labels.nonGoals}**：${spec.nonGoals.map((item) => line(item, labels)).join('；')}`);
-  }
-  if (spec.deliverable.format !== undefined) {
-    out.push(`**${labels.deliverable}**：${itemText(spec.deliverable.format, labels)}`);
-  }
-  if (spec.acceptance.length > 0) {
-    out.push(`**${labels.acceptance}**：${spec.acceptance.map((item) => line(item, labels)).join('；')}`);
-  }
-  if (spec.openQuestions.length > 0) {
-    out.push(`**${labels.questions}**：${spec.openQuestions.join('；')}`);
-  }
+  bullet(
+    labels.requirements,
+    spec.requirements.map((requirement, index) => `${index + 1}) ${line(requirement, labels)}`),
+  );
+  bullet(labels.constraints, spec.constraints.map((item) => line(item, labels)));
+  bullet(labels.nonGoals, spec.nonGoals.map((item) => line(item, labels)));
+  // In the compact style the sub-labels cost more than they explain.
+  bullet(
+    labels.deliverable,
+    [spec.deliverable.format, spec.deliverable.length, spec.deliverable.audience]
+      .filter((item): item is Item => item !== undefined)
+      .map((item) => itemText(item, labels)),
+  );
+  bullet(labels.acceptance, spec.acceptance.map((item) => line(item, labels)));
+  bullet(labels.questions, [...spec.openQuestions, ...spec.assumptions.map((item) => item.text)]);
   return out;
 }
 
 /** `checklist`: everything as checkboxes, for agent handoff. */
 function renderChecklist(spec: PromptSpec, labels: Labels): string[] {
-  const out: string[] = [];
-  out.push(`- [ ] ${labels.objective}：${itemText(spec.objective, labels)}`);
+  const out: string[] = [`- [ ] ${kv(labels.objective, itemText(spec.objective, labels), labels)}`];
   for (const requirement of spec.requirements) out.push(`- [ ] ${line(requirement, labels)}`);
-  for (const item of spec.constraints) out.push(`- [ ] ${labels.constraints}：${line(item, labels)}`);
-  for (const item of spec.nonGoals) out.push(`- [ ] ${labels.nonGoals}：${line(item, labels)}`);
-  if (spec.deliverable.format !== undefined) {
-    out.push(`- [ ] ${labels.deliverable}：${itemText(spec.deliverable.format, labels)}`);
-  }
-  for (const item of spec.acceptance) out.push(`- [ ] ${labels.acceptance}：${line(item, labels)}`);
+  for (const item of spec.constraints) out.push(`- [ ] ${kv(labels.constraints, line(item, labels), labels)}`);
+  for (const item of spec.nonGoals) out.push(`- [ ] ${kv(labels.nonGoals, line(item, labels), labels)}`);
+  for (const entry of deliverableLines(spec, labels)) out.push(`- [ ] ${entry.replace(/^- /u, '')}`);
+  for (const item of spec.acceptance) out.push(`- [ ] ${kv(labels.acceptance, line(item, labels), labels)}`);
   if (spec.openQuestions.length > 0) {
-    out.push(`- [ ] ${labels.questions}：${spec.openQuestions.join('；')}`);
+    out.push(`- [ ] ${kv(labels.questions, spec.openQuestions.join('；'), labels)}`);
   }
   return out;
 }
@@ -212,8 +197,7 @@ export function renderSpec(
   options: { style?: StyleName; keepOriginal?: 'auto' | 'on' | 'off' } = {},
 ): RenderResult {
   const style = options.style ?? spec.meta.style ?? 'bluf';
-  const lang = renderLanguage(spec.meta.source);
-  const labels = LABELS[lang];
+  const labels = LABELS[renderLanguage(spec.meta.source)];
 
   const body =
     style === 'compact'
@@ -223,8 +207,10 @@ export function renderSpec(
         : renderBluf(spec, labels);
 
   const keptOriginal = shouldKeepOriginal(spec, options.keepOriginal ?? 'auto');
-  const parts = body.filter((entry, index, array) => !(entry === '' && array[index - 1] === ''));
-  const text = parts.join('\n').trimEnd();
+  const text = body
+    .filter((entry, index, array) => !(entry === '' && array[index - 1] === ''))
+    .join('\n')
+    .trimEnd();
 
   const withOriginal = keptOriginal
     ? `${text}\n\n---\n\n## ${labels.original}\n\n${spec.meta.source.trim()}\n`

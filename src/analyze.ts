@@ -137,21 +137,98 @@ function findDeliverableSentence(units: Unit[]): string | undefined {
   return undefined;
 }
 
-function defaultDeliverable(intent: IntentClass): string {
-  switch (intent) {
-    case 'answer':
-      return '直接回答，先给结论，再给依据';
-    case 'debug':
-      return '根因判断 + 修复方案 + 验证方式';
-    case 'write':
-      return '可直接使用的成稿文本';
-    case 'plan':
-      return '分步计划，每步含产出与验收';
-    case 'execute':
-      return '可运行的改动 + 简短的变更说明';
-    default:
-      return '按最小可行形式交付，并说明你做了哪些假设';
-  }
+type Lang = 'zh' | 'en';
+
+/**
+ * Every string the analyzer generates itself, in both languages.
+ *
+ * These are the only words in a compiled prompt that the user did not write, so
+ * they are also the only place a language mismatch can show up. Keeping them in
+ * one table makes that impossible to forget when adding a new inference.
+ */
+const CONTENT = {
+  zh: {
+    emptyObjective: '（未提供具体内容）',
+    listObjective: '完成下列要求',
+    acceptanceFallback: '逐条对照上面的要求自检，并说明未满足的条目',
+    deliverable: {
+      answer: '直接回答，先给结论，再给依据',
+      debug: '根因判断 + 修复方案 + 验证方式',
+      write: '可直接使用的成稿文本',
+      plan: '分步计划，每步含产出与验收',
+      execute: '可运行的改动 + 简短的变更说明',
+      unknown: '按最小可行形式交付，并说明你做了哪些假设',
+    },
+    gaps: {
+      audience: {
+        question: '这份内容主要给谁看？（决定深度、术语与语气）',
+        assumption: '受众默认具备基础背景的通用读者',
+        impact: '受众判断错，深度与措辞需要重写',
+      },
+      scope: {
+        question: '这几件事是一次全做，还是先做第一件？',
+        assumption: '按顺序全部完成，先交付第一件',
+        impact: '范围超出单个回答的容量，后几项会变浅',
+      },
+      format: {
+        question: '希望什么形态的交付物？',
+        impact: '形态不对需要整体返工',
+      },
+      acceptance: {
+        question: '怎样算做完？（能跑通的命令 / 通过测试 / 字数范围）',
+        assumption: '按上文逐条自检，并说明哪些条目未满足',
+        impact: '无法验收，返工概率上升',
+      },
+      stack: {
+        question: '技术栈与运行环境是什么？',
+        assumption: '沿用项目现有技术栈与版本',
+        impact: '环境不符会导致代码不可用',
+      },
+    },
+  },
+  en: {
+    emptyObjective: '(nothing concrete provided)',
+    listObjective: 'Complete the requirements below',
+    acceptanceFallback: 'Check each requirement above before answering, and name any you could not meet',
+    deliverable: {
+      answer: 'A direct answer: conclusion first, then the reasoning',
+      debug: 'Root cause + fix + how to verify',
+      write: 'A finished text the user can ship as-is',
+      plan: 'A step-by-step plan, each step with an output and a check',
+      execute: 'A working change plus a short note on what changed',
+      unknown: 'The smallest useful form of the deliverable, with the assumptions stated',
+    },
+    gaps: {
+      audience: {
+        question: 'Who is this for? (sets depth, jargon and tone)',
+        assumption: 'A general reader with basic background',
+        impact: 'Wrong audience means the depth and wording must be rewritten',
+      },
+      scope: {
+        question: 'Do all of these at once, or the first one only?',
+        assumption: 'All of them, in order, delivering the first first',
+        impact: 'Too much scope for one answer; later items get shallow',
+      },
+      format: {
+        question: 'What form should the deliverable take?',
+        impact: 'Wrong form means a full redo',
+      },
+      acceptance: {
+        question: 'How will you know it is done? (a command that runs / tests that pass / a length)',
+        assumption: 'Self-check against the requirements above and name anything unmet',
+        impact: 'Nothing to verify against; rework becomes likely',
+      },
+      stack: {
+        question: 'Which stack and runtime versions?',
+        assumption: 'The project’s existing stack and versions',
+        impact: 'Wrong environment means the code cannot run',
+      },
+    },
+  },
+} as const;
+
+function defaultDeliverable(intent: IntentClass, lang: Lang): string {
+  return CONTENT[lang].deliverable[intent];
 }
 
 function detectAudience(raw: string): string | undefined {
@@ -173,13 +250,14 @@ function detectLength(raw: string): string | undefined {
  * demote it out of the requirements. In that case the objective is an explicitly
  * marked inference instead, and every item stays a requirement.
  */
-function pickObjective(units: Unit[], intent: IntentClass): { item: Item; unit?: Unit } {
-  if (units.length === 0) return { item: { text: '（未提供具体内容）', source: 'inferred' } };
+function pickObjective(units: Unit[], intent: IntentClass, lang: Lang): { item: Item; unit?: Unit } {
+  const content = CONTENT[lang];
+  if (units.length === 0) return { item: { text: content.emptyObjective, source: 'inferred' } };
 
   if (intent === 'answer') {
     const question = units.find((unit) => /[?？]/u.test(unit.text)) ?? units[0];
     return question === undefined
-      ? { item: { text: '（未提供具体内容）', source: 'inferred' } }
+      ? { item: { text: content.emptyObjective, source: 'inferred' } }
       : { item: { text: question.text, source: 'user' }, unit: question };
   }
 
@@ -188,9 +266,9 @@ function pickObjective(units: Unit[], intent: IntentClass): { item: Item; unit?:
 
   const anyRequirement = units.find((unit) => unit.role === 'requirement');
   if (anyRequirement === undefined) {
-    return { item: { text: units[0]?.text ?? '', source: 'user' }, unit: units[0] };
+    return { item: { text: units[0]?.text ?? content.emptyObjective, source: 'user' }, unit: units[0] };
   }
-  return { item: { text: '完成下列要求', source: 'inferred' } };
+  return { item: { text: content.listObjective, source: 'inferred' } };
 }
 
 interface Gap {
@@ -206,7 +284,9 @@ function collectGaps(
   acceptance: Item[],
   goals: number,
   raw: string,
+  lang: Lang,
 ): Gap[] {
+  const content = CONTENT[lang];
   const gaps: Gap[] = [];
   const isWriting = intent === 'write' || intent === 'plan';
 
@@ -214,32 +294,32 @@ function collectGaps(
     gaps.push({
       id: 'audience',
       rank: 1,
-      question: '这份内容主要给谁看？（决定深度、术语与语气）',
-      assumption: { text: '受众默认具备基础背景的通用读者', impact: '受众判断错，深度与措辞需要重写' },
+      question: content.gaps.audience.question,
+      assumption: { text: content.gaps.audience.assumption, impact: content.gaps.audience.impact },
     });
   }
   if (goals >= 2) {
     gaps.push({
       id: 'scope',
       rank: 1,
-      question: '这几件事是一次全做，还是先做第一件？',
-      assumption: { text: '按顺序全部完成，先交付第一件', impact: '范围超出单个回答的容量，后几项会变浅' },
+      question: content.gaps.scope.question,
+      assumption: { text: content.gaps.scope.assumption, impact: content.gaps.scope.impact },
     });
   }
   if (deliverable.format === undefined) {
     gaps.push({
       id: 'format',
       rank: 2,
-      question: '希望什么形态的交付物？',
-      assumption: { text: defaultDeliverable(intent), impact: '形态不对需要整体返工' },
+      question: content.gaps.format.question,
+      assumption: { text: defaultDeliverable(intent, lang), impact: content.gaps.format.impact },
     });
   }
   if (acceptance.length === 0) {
     gaps.push({
       id: 'acceptance',
       rank: 2,
-      question: '怎样算做完？（能跑通的命令 / 通过测试 / 字数范围）',
-      assumption: { text: '按上文逐条自检，并说明哪些条目未满足', impact: '无法验收，返工概率上升' },
+      question: content.gaps.acceptance.question,
+      assumption: { text: content.gaps.acceptance.assumption, impact: content.gaps.acceptance.impact },
     });
   }
   if (
@@ -249,8 +329,8 @@ function collectGaps(
     gaps.push({
       id: 'stack',
       rank: 3,
-      question: '技术栈与运行环境是什么？',
-      assumption: { text: '沿用项目现有技术栈与版本', impact: '环境不符会导致代码不可用' },
+      question: content.gaps.stack.question,
+      assumption: { text: content.gaps.stack.assumption, impact: content.gaps.stack.impact },
     });
   }
   return gaps;
@@ -265,6 +345,7 @@ export function analyzeWithRules(raw: string, gateResult?: GateResult, options: 
   // anchors, but never promoted into an instruction slot.
   const { clean, suspicious } = splitInjection(raw);
   const analyzed = suspicious === undefined ? raw : clean;
+  const lang: Lang = hasCJK(analyzed) ? 'zh' : 'en';
   const { anchors, body } = collectAnchors(analyzed);
 
   const blocks = body.split(/\n\s*\n/u);
@@ -280,7 +361,7 @@ export function analyzeWithRules(raw: string, gateResult?: GateResult, options: 
     }
   }
 
-  const objective = pickObjective(units, intent);
+  const objective = pickObjective(units, intent, lang);
   const requirementUnits = units.filter((unit) => unit.role === 'requirement' && unit !== objective.unit);
   const requirements: Requirement[] = requirementUnits.map((unit, index) => ({
     id: `R${index + 1}`,
@@ -301,7 +382,7 @@ export function analyzeWithRules(raw: string, gateResult?: GateResult, options: 
   const audience = detectAudience(raw);
   if (audience !== undefined) deliverable.audience = { text: audience, source: 'user' };
 
-  const gaps = collectGaps(intent, deliverable, acceptance, result.signals.goals, raw);
+  const gaps = collectGaps(intent, deliverable, acceptance, result.signals.goals, raw, lang);
   const openQuestions = gaps
     .filter((gap) => gap.rank <= 2)
     .slice(0, 3)
@@ -309,10 +390,10 @@ export function analyzeWithRules(raw: string, gateResult?: GateResult, options: 
   const assumptions = gaps.map((gap) => gap.assumption);
 
   if (deliverable.format === undefined) {
-    deliverable.format = { text: defaultDeliverable(intent), source: 'inferred' };
+    deliverable.format = { text: defaultDeliverable(intent, lang), source: 'inferred' };
   }
   if (acceptance.length === 0) {
-    acceptance.push({ text: '逐条对照上面的要求自检，并说明未满足的条目', source: 'inferred' });
+    acceptance.push({ text: CONTENT[lang].acceptanceFallback, source: 'inferred' });
   }
 
   const allAnchors = suspicious === undefined ? anchors : [...anchors, suspicious];
