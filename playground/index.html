@@ -102,6 +102,10 @@
       .seed.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, transparent); }
       .seed b { display: block; font-size: 13px; margin-bottom: 4px; font-weight: 600; }
       .seed span { font-size: 12px; color: var(--muted); line-height: 1.55; }
+      .chip.example { border-style: solid; border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); color: var(--accent); }
+      .q-options button.pre { border-style: dashed; border-color: color-mix(in srgb, var(--accent) 50%, var(--line)); }
+      .ctx-note { margin-top: 8px; font-size: 12px; color: var(--muted); }
+      .ctx-note code { background: color-mix(in srgb, var(--accent) 10%, transparent); padding: 0 4px; border-radius: 4px; }
       .answers { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
       .answer {
         display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px;
@@ -154,6 +158,7 @@
         <label for="input">你要发给 AI 的话</label>
         <textarea id="input" spellcheck="false" placeholder="例如：帮我优化一下这个东西"></textarea>
         <div class="chips" id="samples"></div>
+        <div class="chips"><button class="chip example" id="example">▶ 看个例子（30 秒）</button></div>
         <div id="secrets"></div>
         <div class="status" id="status"></div>
         <div class="chips" id="strict-row">
@@ -182,6 +187,7 @@
             <div>
               <label for="style">排版</label>
               <select id="style">
+                <option value="chat">一句话（能直接发）</option>
                 <option value="bluf">分节</option>
                 <option value="compact">紧凑</option>
                 <option value="checklist">勾选清单</option>
@@ -215,6 +221,7 @@
       import { answerQuestion, questionsFor } from './dist/questions.js';
       import { describe as describeSecret, redactOne, scanSecrets } from './dist/redact.js';
       import { seedsFor } from './dist/seeds.js';
+      import { splitContext } from './dist/text.js';
 
       const input = document.getElementById('input');
       const statusEl = document.getElementById('status');
@@ -230,6 +237,26 @@
 
       /** Chosen answers, keyed by gap id. Re-applied on every keystroke. */
       const answers = new Map();
+
+      // Remembered choices are a hint, never an automatic answer: preselecting
+      // what someone picked last time would let them forget what they agreed to.
+      const MEMORY_KEY = 'prompt-funnel:answers';
+      function loadMemory() {
+        try {
+          return JSON.parse(localStorage.getItem(MEMORY_KEY) ?? '{}');
+        } catch {
+          return {};
+        }
+      }
+      function remember(id, value) {
+        const memory = loadMemory();
+        memory[id] = value;
+        try {
+          localStorage.setItem(MEMORY_KEY, JSON.stringify(memory));
+        } catch {
+          /* private mode: memory is a nicety, not a requirement */
+        }
+      }
       /** A direction from the hand-written library, if the user picked one. */
       let pickedSeed = null;
       const ASK_FOR_OPTIONS = '先给我三个方向选';
@@ -243,12 +270,22 @@
         risk: '风险',
       };
 
+      const EXAMPLE = '帮我写个爬虫，顺便加个代理池，再做个面板';
+
       const SAMPLES = [
         '帮我优化一下这个东西',
         '帮我写个爬虫，顺便加个代理池，再做个面板',
         '写一篇关于向量数据库的科普文章',
         'make it better',
       ];
+
+      const exampleButton = document.getElementById('example');
+      exampleButton.addEventListener('click', () => {
+        input.value = EXAMPLE;
+        answers.clear();
+        render();
+        document.getElementById('status').scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      });
 
       const samplesEl = document.getElementById('samples');
       for (const sample of SAMPLES) {
@@ -278,11 +315,15 @@
 
       function renderQuestions(questions) {
         questionsEl.innerHTML = '';
+        const memory = loadMemory();
         for (const question of questions) {
           const card = document.createElement('div');
           card.className = 'q';
           const options = question.options
-            .map((option) => `<button data-id="${escapeHtml(question.id)}" data-value="${escapeHtml(option)}">${escapeHtml(option)}</button>`)
+            .map((option) => {
+              const previous = memory[question.id] === option;
+              return `<button data-id="${escapeHtml(question.id)}" data-value="${escapeHtml(option)}"${previous ? ' class="pre" title="上次你选了这个"' : ''}>${escapeHtml(option)}</button>`;
+            })
             .join('');
           card.innerHTML = `
             <div class="q-title">${escapeHtml(question.question)}</div>
@@ -293,6 +334,7 @@
         questionsEl.querySelectorAll('button[data-id]').forEach((button) => {
           button.addEventListener('click', () => {
             answers.set(button.dataset.id, button.dataset.value);
+            remember(button.dataset.id, button.dataset.value);
             render();
           });
         });
@@ -388,12 +430,17 @@
 
         renderSecrets(scanSecrets(text));
 
-        const verdict = gate(text);
-        const base = analyzeWithRules(text, verdict);
-        let spec = base;
+        const split = splitContext(text);
+        const request = split.separated ? split.request : text;
+        const verdict = gate(request);
+        let spec = analyzeWithRules(request, verdict);
+        if (split.separated) {
+          if (split.context.length > 0) spec.context = [{ text: split.context, source: 'user' }];
+          spec.meta.source = text;
+        }
         for (const [id, value] of answers) spec = answerQuestion(spec, id, value);
 
-        renderSeeds(text);
+        renderSeeds(request);
 
         const chosen = getTemplate(templateSel.value);
         if (chosen.id !== 'default') spec = applyTemplate(spec, chosen);
@@ -421,15 +468,18 @@
         count.textContent =
           verdict.decision === 'pass' ? '原样发送 · 未改写' : `收束后 ${rendered.text.length} 字`;
 
+        const ctxNote = split.separated
+          ? '<div class="ctx-note">已把 <code>---</code> 上面的部分当背景资料：原样带上，不拆成要求。</div>'
+          : '';
         if (verdict.decision === 'pass') {
           statusEl.className = 'status ok';
-          statusEl.innerHTML = '<b>这句话已经够清楚了</b>，原样发就行，不用改。';
+          statusEl.innerHTML = `<b>这句话已经够清楚了</b>，原样发就行，不用改。${ctxNote}`;
         } else if (questions.length > 0) {
           statusEl.className = 'status todo';
-          statusEl.innerHTML = `<b>还缺 ${questions.length} 件事</b>。不问的话，模型会替你决定——选一下，或者直接复制下面的版本。`;
+          statusEl.innerHTML = `<b>还缺 ${questions.length} 件事</b>。不问的话，模型会替你决定——选一下，或者直接复制下面的版本。${ctxNote}`;
         } else {
           statusEl.className = 'status ok';
-          statusEl.innerHTML = '<b>补齐了</b>。下面这一版可以复制走了。';
+          statusEl.innerHTML = `<b>补齐了</b>。下面这一版可以复制走了。${ctxNote}`;
         }
 
         axesEl.innerHTML = Object.entries(verdict.axes)

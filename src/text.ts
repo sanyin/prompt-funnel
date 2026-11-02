@@ -171,3 +171,30 @@ export function splitInjection(text: string): { clean: string; suspicious?: stri
     .replace(/[：:，,]+$/u, '');
   return { clean, suspicious: match[0] };
 }
+
+/** Result of separating pasted background material from the actual request. */
+export interface SplitContext {
+  context: string;
+  request: string;
+  separated: boolean;
+}
+
+/**
+ * Split a paste into background material and the request itself.
+ *
+ * People do not type a brief; they paste a stack trace and then add one line at
+ * the bottom. Treating the trace as requirements produces three numbered items
+ * that are all wrong. A line of three or more dashes is the separator — the same
+ * convention markdown already taught everyone.
+ */
+export function splitContext(raw: string): SplitContext {
+  const lines = raw.split(/\r?\n/u);
+  const index = lines.findIndex((line) => /^\s*-{3,}\s*$/u.test(line));
+  if (index === -1) return { context: '', request: raw.trim(), separated: false };
+
+  const context = lines.slice(0, index).join('\n').trim();
+  const request = lines.slice(index + 1).join('\n').trim();
+  // Dashes with nothing after them are not a separator, they are the message.
+  if (request.length === 0) return { context: '', request: raw.trim(), separated: false };
+  return { context, request, separated: true };
+}

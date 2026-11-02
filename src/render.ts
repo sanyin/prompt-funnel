@@ -199,6 +199,82 @@ function renderChecklist(spec: PromptSpec, labels: Labels): string[] {
   return out;
 }
 
+/**
+ * `chat`: one message a person could actually send.
+ *
+ * The structured styles are a document. Most people are pasting into a chat box,
+ * and a document is the wrong shape there — it reads as "you must learn to write
+ * specs first". So this style keeps every fact and drops the scaffolding: no
+ * headings, no checkboxes, no per-line provenance markers.
+ *
+ * Provenance is not dropped though: the closing line enumerates the defaults in
+ * plain language, so an assumption still cannot pass as something the user said.
+ */
+function renderChat(spec: PromptSpec, labels: Labels): string[] {
+  const zh = labels.colon === '：';
+  const stop = zh ? '。' : '. ';
+  const sep = zh ? '；' : '; ';
+  const paragraphs: string[] = [];
+
+  if (spec.context.length > 0) {
+    const body = spec.context.map((item) => item.text.trim()).join(zh ? '\n' : '\n');
+    paragraphs.push(`${labels.context}${labels.colon}${body}`);
+  }
+
+  let main = spec.objective.text.trim();
+  if (spec.requirements.length > 0) {
+    // No numbering here: this style is prose, and a list marker would also read
+    // as an invented literal to the fidelity check.
+    const body = spec.requirements.map((item) => item.text.trim()).join(sep);
+    main += `${stop}${zh ? '另外还要' : 'Also'}${labels.colon}${body}`;
+  }
+  if (spec.constraints.length > 0) {
+    main += `${stop}${labels.constraints}${labels.colon}${spec.constraints.map((item) => item.text.trim()).join(sep)}`;
+  }
+  paragraphs.push(main);
+
+  const second: string[] = [];
+  const deliverable = [spec.deliverable.format, spec.deliverable.length, spec.deliverable.audience].filter(
+    (item): item is Item => item !== undefined,
+  );
+  if (deliverable.length > 0) {
+    second.push(`${labels.deliverable}${labels.colon}${deliverable.map((item) => item.text.trim()).join(sep)}`);
+  }
+  // "不出现：X" is a negative criterion; it reads better as a wish than a checklist.
+  const negative = spec.acceptance.filter((item) => item.text.startsWith('不出现：'));
+  const positive = spec.acceptance.filter((item) => !item.text.startsWith('不出现：'));
+  if (positive.length > 0) {
+    const body = positive.map((item) => item.text.trim()).join(sep);
+    second.push(zh ? `做到这些就算完成${labels.colon}${body}` : `${labels.acceptance}${labels.colon}${body}`);
+  }
+  if (negative.length > 0) {
+    const body = negative.map((item) => item.text.replace(/^不出现：/u, '')).join(sep);
+    second.push(zh ? `我最不想要的是${body}` : `What I least want is ${body}`);
+  }
+  if (second.length > 0) paragraphs.push(`${second.join(sep)}${stop}`);
+
+  // The one place provenance survives: defaults are stated, in the user's voice,
+  // as things the model may choose — not as things the user said.
+  const said = paragraphs.join('\n');
+  const fresh = spec.assumptions.filter((item) => !said.includes(item.text.trim()));
+  if (fresh.length > 0) {
+    const body = fresh.map((item) => item.text.trim()).join(sep);
+    paragraphs.push(
+      zh
+        ? `没说的地方我先按这几条处理${labels.colon}${body}。不对的话告诉我，我改。`
+        : `Where you have no instruction, use these defaults: ${body}. Tell me if any of that is wrong.`,
+    );
+  } else if (spec.openQuestions.length > 0) {
+    paragraphs.push(
+      zh
+        ? '没交代的地方你按常见做法决定，但要说清楚你替我决定了什么。'
+        : 'Where I have not said, decide for yourself — but say what you decided for me.',
+    );
+  }
+
+  return [paragraphs.join('\n\n')];
+}
+
 /** Decide whether to re-attach the source text. */
 export function shouldKeepOriginal(spec: PromptSpec, mode: 'auto' | 'on' | 'off'): boolean {
   if (mode === 'on') return true;
@@ -221,13 +297,18 @@ export function renderSpec(
   const labels = LABELS[renderLanguage(spec.meta.source)];
 
   const body =
-    style === 'compact'
-      ? renderCompact(spec, labels)
-      : style === 'checklist'
-        ? renderChecklist(spec, labels)
-        : renderBluf(spec, labels);
+    style === 'chat'
+      ? renderChat(spec, labels)
+      : style === 'compact'
+        ? renderCompact(spec, labels)
+        : style === 'checklist'
+          ? renderChecklist(spec, labels)
+          : renderBluf(spec, labels);
 
-  const keptOriginal = shouldKeepOriginal(spec, options.keepOriginal ?? 'auto');
+  // A chat message with an appendix is not a chat message. Only an explicit
+  // `on` re-attaches the source in this style.
+  const keepMode = style === 'chat' ? (options.keepOriginal ?? 'off') : (options.keepOriginal ?? 'auto');
+  const keptOriginal = shouldKeepOriginal(spec, keepMode);
   const text = body
     .filter((entry, index, array) => !(entry === '' && array[index - 1] === ''))
     .join('\n')

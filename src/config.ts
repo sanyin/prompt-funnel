@@ -58,7 +58,7 @@ function merge(base: FunnelConfig, patch: unknown): FunnelConfig {
       engine === 'auto' || engine === 'rules' || engine === 'api' || engine === 'host'
         ? (engine as FunnelConfig['engine'])
         : base.engine,
-    style: style === 'bluf' || style === 'compact' || style === 'checklist' ? style : base.style,
+    style: style === 'bluf' || style === 'compact' || style === 'checklist' || style === 'chat' ? style : base.style,
     api: {
       baseUrl: typeof api['baseUrl'] === 'string' ? api['baseUrl'] : base.api.baseUrl,
       model: typeof api['model'] === 'string' ? api['model'] : base.api.model,
@@ -129,3 +129,4 @@ export function resolveEngine(requested: FunnelConfig['engine'] | undefined, con
   if (choice === 'rules' || choice === 'api' || choice === 'host') return choice;
   return resolveApiKey(config) !== undefined ? 'api' : 'rules';
 }
+

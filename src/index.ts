@@ -28,6 +28,8 @@ export { answerAll, answerQuestion, questionsFor } from './questions.js';
 export type { Question } from './questions.js';
 export { seedsFor, detectDomain, seedDomains, seedCount, MAX_SEEDS } from './seeds.js';
 export type { Seed, SeedDomain } from './seeds.js';
+export { splitContext } from './text.js';
+export type { SplitContext } from './text.js';
 export { applyTemplate, getTemplate, TEMPLATES, templateIds } from './templates.js';
 export type { Template } from './templates.js';
 export { composeContinuation, rootObjective, summarize } from './session.js';

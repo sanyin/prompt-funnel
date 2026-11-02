@@ -16,6 +16,7 @@ import { gate } from './gate.js';
 import { requestSpec } from './llm.js';
 import { renderSpec } from './render.js';
 import { redactAll, scanSecrets } from './redact.js';
+import { splitContext } from './text.js';
 import { applyTemplate, getTemplate } from './templates.js';
 import { checkFidelity, coerceSpec } from './validate.js';
 
@@ -46,11 +47,19 @@ export async function compile(raw: string, options: CompileOptions = {}, deps: C
   const redactions = options.redact === 'off' ? [] : scanSecrets(trimmed);
   const source = options.redact === 'on' && redactions.length > 0 ? redactAll(trimmed, redactions) : trimmed;
 
-  const verdict = gate(source);
+  const split = splitContext(source);
+  const request = split.separated ? split.request : source;
+  const verdict = gate(request);
   const notes: string[] = [];
 
-  const base = analyzeWithRules(source, verdict, options);
+  const base = analyzeWithRules(request, verdict, options);
   base.meta.style = style;
+  if (split.separated) {
+    // The context is carried verbatim; the request is what gets analysed. The
+    // fidelity check still runs against everything the user pasted.
+    if (split.context.length > 0) base.context = [{ text: split.context, source: 'user' }];
+    base.meta.source = source;
+  }
 
   if (options.force !== true && options.template === undefined && verdict.decision === 'pass') {
     const fidelity = checkFidelity(base, source);

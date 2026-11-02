@@ -132,7 +132,7 @@ export interface SpecMeta {
 export type EngineName = 'rules' | 'api' | 'host';
 
 /** Rendering style. */
-export type StyleName = 'bluf' | 'compact' | 'checklist';
+export type StyleName = 'bluf' | 'compact' | 'checklist' | 'chat';
 
 /** One problem found while validating a spec or its rendering. */
 export interface Issue {
