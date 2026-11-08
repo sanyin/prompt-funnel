@@ -95,6 +95,17 @@
       }
       .q-options button:hover { border-color: var(--accent); color: var(--accent); }
       .q-foot { margin-top: 9px; font-size: 11.5px; color: var(--muted); }
+      .q-options button.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); color: var(--accent); }
+      .q-title .multi { margin-left: 6px; font-size: 10.5px; color: var(--muted); border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; }
+      .q-say { margin-top: 8px; }
+      .q-done { margin-top: 8px; }
+      .q-done button { font: inherit; font-size: 12px; padding: 4px 10px; border-radius: 7px; border: 1px solid var(--accent); background: var(--accent); color: #fff; cursor: pointer; }
+      @media (prefers-color-scheme: dark) { .q-done button { color: #10120f; } }
+      .q-say .say { font: inherit; font-size: 12px; padding: 3px 8px; border-radius: 7px; border: 1px dashed var(--line); background: transparent; color: var(--muted); cursor: pointer; }
+      .q-say .say:hover { color: var(--accent); border-color: var(--accent); }
+      .say-row { display: flex; gap: 6px; align-items: center; }
+      .say-row input { flex: 1; font: inherit; font-size: 12.5px; padding: 6px 8px; border-radius: 7px; border: 1px solid var(--accent); background: var(--panel); color: var(--ink); }
+      .say-row button { border: 0; background: none; color: var(--muted); cursor: pointer; font-size: 15px; padding: 0 4px; }
       .seeds { margin-top: 12px; display: grid; gap: 8px; }
       .seeds-note { font-size: 11.5px; color: var(--muted); margin: 14px 0 0; }
       .seed { text-align: left; width: 100%; border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; background: var(--bg); cursor: pointer; font: inherit; color: inherit; }
@@ -237,6 +248,13 @@
 
       /** Chosen answers, keyed by gap id. Re-applied on every keystroke. */
       const answers = new Map();
+      /** Every question seen for the current text, so a multi-select card can
+       *  stay on screen after its first pick (the gap disappears from the spec). */
+      const questionCache = new Map();
+      /** Multi questions the user has finished answering. */
+      const finalized = new Set();
+      /** Which text the cache belongs to: answers must survive re-renders. */
+      let cacheText = null;
 
       // Remembered choices are a hint, never an automatic answer: preselecting
       // what someone picked last time would let them forget what they agreed to.
@@ -313,44 +331,142 @@
         return String(value).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
       }
 
+      /** Rank options by what this request and this person make likely. */
+      function rankOptions(question, request, memory) {
+        const score = (option) => {
+          let value = 0;
+          if (request.includes(option)) value += 3;
+          if (memory[question.id] === option) value += 2;
+          return value;
+        };
+        return [...question.options]
+          .map((option, index) => ({ option, index, score: score(option) }))
+          .sort((a, b) => b.score - a.score || a.index - b.index)
+          .map((entry) => entry.option);
+      }
+
+      function answerFor(id) {
+        const existing = answers.get(id);
+        if (existing !== undefined) return existing;
+        const fresh = { values: [] };
+        answers.set(id, fresh);
+        return fresh;
+      }
+
       function renderQuestions(questions) {
         questionsEl.innerHTML = '';
         const memory = loadMemory();
+        const request = splitContext(input.value.trim()).request;
+
         for (const question of questions) {
+          const current = answerFor(question.id);
+          const confirmed = current.values.length > 0 || (current.custom ?? '').trim().length > 0;
           const card = document.createElement('div');
           card.className = 'q';
-          const options = question.options
+
+          const options = rankOptions(question, request, memory)
             .map((option) => {
+              const on = current.values.includes(option);
               const previous = memory[question.id] === option;
-              return `<button data-id="${escapeHtml(question.id)}" data-value="${escapeHtml(option)}"${previous ? ' class="pre" title="上次你选了这个"' : ''}>${escapeHtml(option)}</button>`;
+              const cls = on ? ' class="on"' : previous ? ' class="pre" title="上次你选了这个"' : '';
+              return `<button type="button" data-id="${escapeHtml(question.id)}" data-value="${escapeHtml(option)}"${cls} aria-pressed="${on}">${escapeHtml(option)}</button>`;
             })
             .join('');
+
+          const custom = current.custom;
+          const customUi =
+            custom === undefined
+              ? `<button type="button" class="say" data-say="${escapeHtml(question.id)}">✎ 都不是，我自己说…</button>`
+              : `<div class="say-row">
+                   <input type="text" data-custom="${escapeHtml(question.id)}" value="${escapeHtml(custom)}" placeholder="用你自己的话说，原样写进提示词" />
+                   <button type="button" data-clear="${escapeHtml(question.id)}" title="收回">×</button>
+                 </div>`;
+
           card.innerHTML = `
-            <div class="q-title">${escapeHtml(question.question)}</div>
+            <div class="q-title">${escapeHtml(question.question)}${question.multi === true ? '<span class="multi">可多选</span>' : ''}</div>
             <div class="q-options">${options}</div>
+            <div class="q-say">${customUi}</div>
+            ${question.multi === true && confirmed ? `<div class="q-done"><button type="button" data-done="${escapeHtml(question.id)}">就这些 ✓</button></div>` : ''}
             <div class="q-foot">不选的话，会默认「${escapeHtml(question.assumption.text)}」。</div>`;
           questionsEl.append(card);
         }
+
         questionsEl.querySelectorAll('button[data-id]').forEach((button) => {
           button.addEventListener('click', () => {
-            answers.set(button.dataset.id, button.dataset.value);
-            remember(button.dataset.id, button.dataset.value);
+            const id = button.dataset.id;
+            const value = button.dataset.value;
+            const question = questions.find((entry) => entry.id === id);
+            const current = answerFor(id);
+            if (question?.multi === true) {
+              current.values = current.values.includes(value)
+                ? current.values.filter((entry) => entry !== value)
+                : [...current.values, value];
+            } else {
+              current.values = current.values[0] === value ? [] : [value];
+            }
+            current.custom = undefined;
+            if (current.values.length === 0) answers.delete(id);
+            else remember(id, value);
             render();
+          });
+        });
+
+        questionsEl.querySelectorAll('button[data-say]').forEach((button) => {
+          button.addEventListener('click', () => {
+            answerFor(button.dataset.say).custom = '';
+            render();
+            const field = questionsEl.querySelector(`input[data-custom="${button.dataset.say}"]`);
+            field?.focus();
+          });
+        });
+
+        questionsEl.querySelectorAll('button[data-clear]').forEach((button) => {
+          button.addEventListener('click', () => {
+            answers.delete(button.dataset.clear);
+            render();
+          });
+        });
+
+        questionsEl.querySelectorAll('button[data-done]').forEach((button) => {
+          button.addEventListener('click', () => {
+            finalized.add(button.dataset.done);
+            render();
+          });
+        });
+
+        questionsEl.querySelectorAll('input[data-custom]').forEach((field) => {
+          field.addEventListener('input', () => {
+            const id = field.dataset.custom;
+            const current = answerFor(id);
+            current.custom = field.value;
+            // Only the output is recomputed: re-rendering the cards would take
+            // the caret away mid-sentence.
+            updateOutput();
           });
         });
       }
 
-      function renderAnswers(applied) {
+      function renderAnswers(questions) {
         answersEl.innerHTML = '';
-        for (const [id, value] of applied) {
-          const pill = document.createElement('span');
-          pill.className = 'answer';
-          pill.innerHTML = `${escapeHtml(value)}<button title="撤销">×</button>`;
-          pill.querySelector('button').addEventListener('click', () => {
-            answers.delete(id);
-            render();
-          });
-          answersEl.append(pill);
+        const open = new Set(questions.map((question) => question.id));
+        for (const [id, answer] of answers) {
+          if (open.has(id)) continue;
+          const parts = answer.custom?.trim() ? [{ text: answer.custom.trim(), custom: true }] : answer.values.map((value) => ({ text: value, custom: false }));
+          for (const part of parts) {
+            if (part.text.length === 0) continue;
+            const pill = document.createElement('span');
+            pill.className = 'answer';
+            pill.innerHTML = `${part.custom ? '✎ ' : ''}${escapeHtml(part.text)}<button title="撤销">×</button>`;
+            pill.querySelector('button').addEventListener('click', () => {
+              const current = answers.get(id);
+              if (current === undefined) return;
+              if (part.custom) current.custom = undefined;
+              else current.values = current.values.filter((value) => value !== part.text);
+              if (current.values.length === 0 && (current.custom === undefined || current.custom.trim() === '')) answers.delete(id);
+              render();
+            });
+            answersEl.append(pill);
+          }
         }
       }
 
@@ -411,25 +527,9 @@
         });
       }
 
-      function render() {
+      /** Build the spec from the current text, answers and toggles. */
+      function computeSpec() {
         const text = input.value.trim();
-        answersEl.innerHTML = '';
-        questionsEl.innerHTML = '';
-
-        if (text.length === 0) {
-          statusEl.textContent = '粘一句话进来试试。';
-          statusEl.className = 'status';
-          document.getElementById('secrets').innerHTML = '';
-          out.textContent = '';
-          count.textContent = '收束后的版本';
-          axesEl.innerHTML = '';
-          specEl.textContent = '';
-          fidelityEl.textContent = '';
-          return;
-        }
-
-        renderSecrets(scanSecrets(text));
-
         const split = splitContext(text);
         const request = split.separated ? split.request : text;
         const verdict = gate(request);
@@ -438,9 +538,7 @@
           if (split.context.length > 0) spec.context = [{ text: split.context, source: 'user' }];
           spec.meta.source = text;
         }
-        for (const [id, value] of answers) spec = answerQuestion(spec, id, value);
-
-        renderSeeds(request);
+        for (const [id, answer] of answers) spec = answerQuestion(spec, id, answer);
 
         const chosen = getTemplate(templateSel.value);
         if (chosen.id !== 'default') spec = applyTemplate(spec, chosen);
@@ -454,13 +552,13 @@
             constraints: [...spec.constraints, { text: `方向参考：${pickedSeed.title}`, source: 'user' }],
           };
         }
+        return { text, request, split, verdict, spec };
+      }
 
-        const questions = verdict.decision === 'pass' ? [] : questionsFor(spec);
-        const remaining = new Set(questions.map((question) => question.id));
-        const applied = [...answers].filter(([id]) => !remaining.has(id));
-        renderAnswers(verdict.decision === 'pass' ? [] : applied);
-        renderQuestions(questions);
-
+      /** Recompute only the result pane; the question cards stay untouched. */
+      function updateOutput() {
+        const { text, split, verdict, spec } = computeSpec();
+        if (text.length === 0) return;
         const rendered = renderSpec(spec, { style: styleSel.value });
         // A clear request is sent byte-for-byte; showing a compiled version here
         // would contradict the status line right above it.
@@ -471,16 +569,67 @@
         const ctxNote = split.separated
           ? '<div class="ctx-note">已把 <code>---</code> 上面的部分当背景资料：原样带上，不拆成要求。</div>'
           : '';
+        const openQuestions = questionsFor(spec);
+        const open = openQuestions.length;
+        // Typed answers need a pill immediately, without a full card re-render
+        // (which would steal the caret).
+        renderAnswers(openQuestions);
         if (verdict.decision === 'pass') {
           statusEl.className = 'status ok';
           statusEl.innerHTML = `<b>这句话已经够清楚了</b>，原样发就行，不用改。${ctxNote}`;
-        } else if (questions.length > 0) {
+        } else if (open > 0) {
           statusEl.className = 'status todo';
-          statusEl.innerHTML = `<b>还缺 ${questions.length} 件事</b>。不问的话，模型会替你决定——选一下，或者直接复制下面的版本。${ctxNote}`;
+          statusEl.innerHTML = `<b>还缺 ${open} 件事</b>。不问的话，模型会替你决定——选一下、自己写，或者直接复制下面的版本。${ctxNote}`;
         } else {
           statusEl.className = 'status ok';
           statusEl.innerHTML = `<b>补齐了</b>。下面这一版可以复制走了。${ctxNote}`;
         }
+        specEl.textContent = JSON.stringify(spec, null, 2);
+        const errors = rendered.fidelity.issues.filter((issue) => issue.severity === 'error');
+        fidelityEl.textContent =
+          `保真 ${(rendered.fidelity.retention * 100).toFixed(0)}% · 未溯源 ${rendered.fidelity.unverifiable.length} · ` +
+          (errors.length > 0 ? `${errors.length} 个错误` : '校验通过');
+      }
+
+      function render() {
+        const text = input.value.trim();
+        answersEl.innerHTML = '';
+        questionsEl.innerHTML = '';
+
+        if (text.length === 0) {
+          statusEl.textContent = '粘一句话进来试试。';
+          statusEl.className = 'status';
+          document.getElementById('secrets').innerHTML = '';
+          out.textContent = '';
+          count.textContent = '收束后的版本';
+          edgesReset();
+          return;
+        }
+
+        renderSecrets(scanSecrets(text));
+        if (cacheText !== text) {
+          questionCache.clear();
+          finalized.clear();
+          cacheText = text;
+        }
+
+        const { request, verdict, spec } = computeSpec();
+        renderSeeds(request);
+
+        const open = verdict.decision === 'pass' ? [] : questionsFor(spec);
+        for (const question of open) questionCache.set(question.id, question);
+        const extra = [...answers.keys()]
+          .filter((id) => questionCache.get(id)?.multi === true && !finalized.has(id) && !open.some((q) => q.id === id))
+          .map((id) => questionCache.get(id));
+        // Keep the original order: a card that jumps to the bottom after the
+        // first pick feels like it was dismissed.
+        const order = new Map([...questionCache.keys()].map((id, index) => [id, index]));
+        const questions = [...open, ...extra].sort(
+          (a, b) => (order.get(a.id) ?? 99) - (order.get(b.id) ?? 99),
+        );
+        renderAnswers(verdict.decision === 'pass' ? [] : questions);
+        renderQuestions(questions);
+        updateOutput();
 
         axesEl.innerHTML = Object.entries(verdict.axes)
           .map(
@@ -488,11 +637,12 @@
               `<div>${AXIS_LABEL[key] ?? key} ${value.toFixed(2)}<div class="bar"><i style="width:${Math.round(value * 100)}%"></i></div></div>`,
           )
           .join('');
-        specEl.textContent = JSON.stringify(spec, null, 2);
-        const errors = rendered.fidelity.issues.filter((issue) => issue.severity === 'error');
-        fidelityEl.textContent =
-          `保真 ${(rendered.fidelity.retention * 100).toFixed(0)}% · 未溯源 ${rendered.fidelity.unverifiable.length} · ` +
-          (errors.length > 0 ? `${errors.length} 个错误` : '校验通过');
+      }
+
+      function edgesReset() {
+        axesEl.innerHTML = '';
+        specEl.textContent = '';
+        fidelityEl.textContent = '';
       }
 
       // One visible toggle for the thing most people want but never ask for:

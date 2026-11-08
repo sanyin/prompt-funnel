@@ -47,7 +47,7 @@ export interface Assumption {
    * The UI turns these into clickable options; answering replaces the default
    * instead of asking the user to edit prose.
    */
-  gap?: { id: string; question: string; options: string[] };
+  gap?: { id: string; question: string; options: string[]; multi?: boolean };
 }
 
 /** A high-risk literal that a rewrite must not invent. */
@@ -132,6 +132,12 @@ export interface SpecMeta {
 export type EngineName = 'rules' | 'api' | 'host';
 
 /** Rendering style. */
+/** One answer to one gap: several picked options, or something typed. */
+export interface AnswerValue {
+  values: string[];
+  custom?: string;
+}
+
 export type StyleName = 'bluf' | 'compact' | 'checklist' | 'chat';
 
 /** One problem found while validating a spec or its rendering. */

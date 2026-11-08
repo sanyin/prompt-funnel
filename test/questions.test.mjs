@@ -135,3 +135,33 @@ test('"I cannot say" is a real answer and invents nothing', () => {
   assert.equal(next.acceptance.length, before);
   assert.ok(!questionsFor(next).some((q) => q.id === 'failure'));
 });
+
+test('gap flags say which questions accept several answers', () => {
+  const flags = Object.fromEntries(questionsFor(vague()).map((q) => [q.id, q.multi === true]));
+  assert.equal(flags.format, true);
+  assert.notEqual(flags.scope, true);
+});
+
+test('several picks become one delivery description', () => {
+  const next = answerQuestion(vague(), 'format', { values: ['一段能直接用的文字', '能跑的代码 + 说明'] });
+  assert.match(next.deliverable.format?.text ?? '', /一段能直接用的文字/);
+  assert.match(next.deliverable.format?.text ?? '', /能跑的代码/);
+});
+
+test('several failure modes become several negative criteria', () => {
+  const spec = analyzeWithRules('帮我写个爬虫');
+  const next = answerQuestion(spec, 'failure', { values: ['做出来不能用', '方向对，但太粗糙'] });
+  assert.equal(next.acceptance.filter((item) => item.text.startsWith('不出现：')).length, 2);
+});
+
+test('typed text wins over the options, and is kept verbatim', () => {
+  const typed = '我想让它在我自己的 Mac 上直接跑通，别用 Docker';
+  const next = answerQuestion(vague(), 'format', { values: ['一份清单或表格'], custom: typed });
+  assert.equal(next.deliverable.format?.text, typed);
+  assert.equal(next.deliverable.format?.source, 'user');
+});
+
+test('a plain string answer still works (backwards compatible)', () => {
+  const next = answerQuestion(vague(), 'format', '一份清单或表格');
+  assert.equal(next.deliverable.format?.text, '一份清单或表格');
+});

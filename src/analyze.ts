@@ -271,6 +271,7 @@ function pickObjective(units: Unit[], intent: IntentClass, lang: Lang): { item: 
 
 interface Gap {
   id: string;
+  multi?: boolean;
   rank: number;
   question: string;
   options: string[];
@@ -345,6 +346,7 @@ function collectGaps(
           ? '「新意 / 竞争力」具体指哪一方面？'
           : 'What kind of "novel" do you mean?',
       options: GAP_OPTIONS[lang].quality ?? [],
+      multi: true,
       assumption: {
         text:
           lang === 'zh'
@@ -375,6 +377,7 @@ function collectGaps(
           ? '什么情况算失败？（你最不想要的结果）'
           : 'What would count as a failure here?',
       options: GAP_OPTIONS[lang].failure ?? [],
+      multi: true,
       assumption: {
         text:
           lang === 'zh'
@@ -393,6 +396,7 @@ function collectGaps(
       rank: 2,
       question: content.gaps.format.question,
       options: GAP_OPTIONS[lang].format ?? [],
+      multi: true,
       assumption: { text: defaultDeliverable(intent, lang), impact: content.gaps.format.impact },
     });
   }
@@ -476,7 +480,15 @@ export function analyzeWithRules(raw: string, gateResult?: GateResult, options: 
   // stay as silent defaults so the prompt never grows a fourth question.
   const assumptions = gaps.map((gap) =>
     asked.includes(gap)
-      ? { ...gap.assumption, gap: { id: gap.id, question: gap.question, options: gap.options } }
+      ? {
+          ...gap.assumption,
+          gap: {
+            id: gap.id,
+            question: gap.question,
+            options: gap.options,
+            ...(gap.multi === true ? { multi: true } : {}),
+          },
+        }
       : gap.assumption,
   );
 

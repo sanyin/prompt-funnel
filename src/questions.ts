@@ -12,13 +12,15 @@
  * @module prompt-funnel/questions
  */
 
-import type { Assumption, PromptSpec, Requirement } from './types.js';
+import type { AnswerValue, Assumption, PromptSpec, Requirement } from './types.js';
 
 /** One answerable gap. */
 export interface Question {
   id: string;
   question: string;
   options: string[];
+  /** Several answers are legitimate (axes of novelty, delivery shapes). */
+  multi?: boolean;
   /** The default that will be used if the question is skipped. */
   assumption: Assumption;
 }
@@ -32,6 +34,7 @@ export function questionsFor(spec: PromptSpec): Question[] {
       id: assumption.gap.id,
       question: assumption.gap.question,
       options: assumption.gap.options,
+      ...(assumption.gap.multi === true ? { multi: true } : {}),
       assumption,
     });
   }
@@ -55,8 +58,12 @@ const ASK_FOR_OPTIONS = /^(?:先给我三个方向选|Give me three directions f
  * question disappear, and the chosen text lands in the section it belongs to,
  * marked `user` — it is the user's choice, not an inference.
  */
-export function answerQuestion(spec: PromptSpec, id: string, answer: string): PromptSpec {
-  const text = answer.trim();
+export function answerQuestion(spec: PromptSpec, id: string, answer: string | AnswerValue): PromptSpec {
+  const values = (typeof answer === 'string' ? [answer] : answer.values).map((value) => value.trim()).filter(Boolean);
+  const custom = typeof answer === 'string' ? undefined : answer.custom?.trim();
+  // Typed text wins: it is the only part that is certainly the user's own words.
+  const parts = custom !== undefined && custom.length > 0 ? [custom] : values;
+  const text = parts.join('；');
   if (text.length === 0) return spec;
 
   const target = spec.assumptions.find((assumption) => assumption.gap?.id === id);
@@ -72,17 +79,17 @@ export function answerQuestion(spec: PromptSpec, id: string, answer: string): Pr
     openQuestions: spec.openQuestions.filter((question) => question !== target.gap?.question),
     meta: { ...spec.meta },
   };
-  const item = { text, source: 'user' as const };
+  const items = parts.map((part) => ({ text: part, source: 'user' as const }));
 
   switch (id) {
     case 'audience':
-      next.deliverable.audience = item;
+      next.deliverable.audience = { text, source: 'user' };
       break;
     case 'format':
-      next.deliverable.format = item;
+      next.deliverable.format = { text, source: 'user' };
       break;
     case 'acceptance':
-      next.acceptance.push(item);
+      next.acceptance.push(...items);
       break;
     case 'quality':
       // "Make it novel" cannot be verified. Either pin the axis, or ask the model
@@ -99,18 +106,20 @@ export function answerQuestion(spec: PromptSpec, id: string, answer: string): Pr
     case 'failure':
       // A failure mode is an acceptance criterion in the negative: "this must not
       // happen". "I cannot say" is a real answer and adds nothing.
-      if (!NO_FAILURE_STATED.test(text)) next.acceptance.push({ text: `不出现：${text}`, source: 'user' });
+      for (const part of parts) {
+        if (!NO_FAILURE_STATED.test(part)) next.acceptance.push({ text: `不出现：${part}`, source: 'user' });
+      }
       break;
     case 'scope':
       // Scope choices narrow the work; they belong with the constraints, not the
       // requirements, or they would be rendered as another thing to deliver.
-      next.constraints.push(item);
+      next.constraints.push(...items);
       break;
     case 'stack':
       next.constraints.push({ text: `技术栈：${text}`, source: 'user' });
       break;
     default:
-      next.constraints.push(item);
+      next.constraints.push(...items);
       break;
   }
 
