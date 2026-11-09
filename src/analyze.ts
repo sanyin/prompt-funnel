@@ -288,6 +288,21 @@ interface Gap {
 const HOLLOW_QUALITY =
   /(?:新意|新颖|创新|竞争力|亮点|高级感|高大上|有质感|惊艳|爆款|别具一格|与众不同)/u;
 
+/**
+ * A role stated in the request itself.
+ *
+ * "你是一个资深程序员，帮我优化一下" already says who should answer. Asking
+ * again, or printing "未指定", would be the tool not reading what it was given.
+ */
+function detectRole(raw: string): string | undefined {
+  const match =
+    /(?:你(?:现在|将)?(?:是|作为)|扮演|以)\s*([^，。；、\n]{2,24}?)(?:的身份|的角度)?(?=[，。；、\n]|$)/u.exec(raw);
+  const captured = match?.[1]?.trim();
+  if (captured === undefined || captured.length === 0) return undefined;
+  const stripped = captured.replace(/^(?:一个|一名|一位|个)\s*/u, '').trim();
+  return stripped.length >= 2 ? stripped : undefined;
+}
+
 /** Words that say this is coursework rather than engineering. */
 const STUDENT_RE = /(?:作业|论文|课程|实验报告|答辩|开题|绩点|老师|教授|导师|学校|学期|期末|文献综述|引用|参考文献)/iu;
 /** Words that say this is engineering work. */
@@ -405,7 +420,7 @@ function collectGaps(
       },
     });
   }
-  if (intent === 'plan' || intent === 'debug' || intent === 'answer') {
+  if (detectRole(raw) === undefined && (intent === 'plan' || intent === 'debug' || intent === 'answer')) {
     gaps.push({
       id: 'role',
       rank: 2,
@@ -538,6 +553,8 @@ export function analyzeWithRules(raw: string, gateResult?: GateResult, options: 
   // A single sentence cannot be both the ask and its own background: the
   // classifier calls long sentences "context", which duplicated the objective.
   const objectiveText = objective.item.text;
+  const detectedRole = detectRole(raw);
+
   const context = toItems(units.filter((unit) => unit.role === 'context'))
     .filter((item) => item.text !== objectiveText && !objectiveText.includes(item.text))
     .slice(0, 8);
@@ -585,6 +602,7 @@ export function analyzeWithRules(raw: string, gateResult?: GateResult, options: 
     version: '1',
     intent,
     objective: objective.item,
+    ...(detectedRole !== undefined ? { role: { text: detectedRole, source: 'user' as const } } : {}),
     context,
     requirements,
     constraints,

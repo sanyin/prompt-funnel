@@ -383,35 +383,41 @@ function renderChat(spec: PromptSpec, labels: Labels): string[] {
  * prompt that will be kept, shared or versioned.
  */
 function renderTemplate(spec: PromptSpec, labels: Labels): string[] {
-  const out: string[] = [];
   const zh = labels.colon === '：';
+  const out: string[] = [];
+  const missing: string[] = [];
+  const block = (position: number, title: string, body: string[]): void => {
+    if (body.length === 0) {
+      missing.push(title);
+      return;
+    }
+    out.push(`## ${position}. ${title}`, ...body, '');
+  };
+
   const role = roleLine(spec, labels);
+  block(1, labels.role, role === undefined ? [] : [role]);
 
-  out.push(`## 1. ${labels.role}`, '', role ?? (zh ? '（未指定，按通用助手回答）' : '(not specified)'), '');
-  out.push(`## 2. ${labels.task}`, '', itemText(spec.objective, labels), '');
-  spec.requirements.forEach((requirement, index) => out.push(`${index + 1}. ${line(requirement, labels)}`));
-  if (spec.requirements.length > 0) out.push('');
-
-  out.push(`## 3. ${labels.context}`, '');
-  const context = contextLines(spec, labels);
-  out.push(...(context.length > 0 ? context : [zh ? '（无额外背景）' : '(none)']), '');
-  const constraints = [...spec.constraints, ...spec.nonGoals];
-  if (constraints.length > 0) {
-    for (const item of constraints) out.push(`- ${line(item, labels)}`);
-    out.push('');
+  const task = [itemText(spec.objective, labels)];
+  if (spec.requirements.length > 0) {
+    task.push('');
+    spec.requirements.forEach((requirement, position) => task.push(`${position + 1}. ${line(requirement, labels)}`));
   }
+  block(2, labels.task, task);
 
-  out.push(`## 4. ${labels.examples}`, '');
-  const examples = exampleLines(spec, labels);
-  out.push(...(examples.length > 0 ? examples.map((entry) => `- ${entry}`) : [zh ? '（未提供）' : '(none)']), '');
+  // Constraints belong to the background section: they are limits on the work,
+  // not work items.
+  block(3, labels.context, [...contextLines(spec, labels), ...[...spec.constraints, ...spec.nonGoals].map((item) => `- ${line(item, labels)}`)]);
 
-  out.push(`## 5. ${labels.output}`, '');
+  block(4, labels.examples, exampleLines(spec, labels));
+
+  const format = [...deliverableLines(spec, labels)];
   const output = outputLine(spec, labels);
-  const deliverable = deliverableLines(spec, labels);
-  out.push(...deliverable);
-  if (output !== undefined) out.push(`- ${output}`);
-  if (deliverable.length === 0 && output === undefined) out.push(zh ? '（未指定）' : '(not specified)');
-  out.push('');
+  if (output !== undefined) format.push(`- ${output}`);
+  block(5, labels.output, format);
+
+  if (missing.length > 0) {
+    out.push(zh ? `_未指定：${missing.join('、')}_` : `_Not specified: ${missing.join(', ')}_`, '');
+  }
 
   if (spec.acceptance.length > 0) {
     out.push(`## ${labels.acceptance}`, '');
