@@ -1,6 +1,6 @@
 {
   "name": "prompt-funnel",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "A convergence gate for AI agents: turn a vague request into a precise, auditable prompt before it reaches the model.",
   "type": "module",
   "bin": {
@@ -24,8 +24,7 @@
     "scripts",
     "docs",
     "README.md",
-    "LICENSE",
-    "tools"
+    "LICENSE"
   ],
   "engines": {
     "node": ">=22"
@@ -38,9 +37,7 @@
     "eval:live": "npm run build && node evals/live.mjs",
     "playground": "npm run build && node scripts/playground.mjs",
     "build:extension": "npm run build && node scripts/build-extension.mjs",
-    "prepublishOnly": "npm run build",
-    "compact": "node tools/compact/cli.mjs",
-    "decision-log": "node tools/decision-log/cli.mjs"
+    "prepublishOnly": "npm run build"
   },
   "keywords": [
     "prompt",
