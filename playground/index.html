@@ -213,6 +213,7 @@
       }
       .q-done button:hover { background: var(--accent); border-color: var(--accent); }
       .q-foot { margin-top: 10px; font-size: 11.5px; color: var(--faint); }
+      .q-foot .why { display: block; margin-top: 3px; color: color-mix(in srgb, var(--accent) 70%, var(--faint)); }
 
       .seeds { display: grid; gap: 0; margin-top: 16px; }
       .seeds-note { font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.06em; color: var(--faint); margin: 0 0 8px; }
@@ -314,6 +315,15 @@
           <div class="questions" id="questions"></div>
           <div class="seeds" id="seeds"></div>
 
+        </section>
+
+        <section class="pane pane-out">
+          <div class="out-head">
+            <span id="count">收束后</span>
+            <button class="primary" id="copy">复制</button>
+          </div>
+          <pre id="out" aria-live="polite"></pre>
+
           <details class="extra">
             <summary>补充（可选）</summary>
             <p class="extra-note">例子比形容词有用；要 JSON 就写字段名。</p>
@@ -345,6 +355,7 @@
               <div>
                 <label for="style">排版</label>
                 <select id="style">
+                  <option value="template">生产级模板（五段）</option>
                   <option value="chat">一句话（能直接发）</option>
                   <option value="bluf">分节</option>
                   <option value="compact">紧凑</option>
@@ -356,14 +367,7 @@
             <div class="spec"><pre id="spec"></pre></div>
             <div class="meta" id="fidelity"></div>
           </details>
-        </section>
 
-        <section class="pane pane-out">
-          <div class="out-head">
-            <span id="count">收束后</span>
-            <button class="primary" id="copy">复制</button>
-          </div>
-          <pre id="out" aria-live="polite"></pre>
         </section>
       </main>
 
@@ -539,7 +543,7 @@
                     <div class="q-options">${options}</div>
                     <div class="q-say">${customUi}</div>
                     ${question.multi === true && confirmed ? `<div class="q-done"><button type="button" data-done="${escapeHtml(question.id)}">就这些 ✓</button></div>` : ''}
-                    <div class="q-foot">不选的话，会默认「${escapeHtml(question.assumption.text)}」。</div>`;
+                    <div class="q-foot">不选的话，会默认「${escapeHtml(question.assumption.text)}」。<span class="why">为什么问：${escapeHtml(question.assumption.impact)}</span></div>`;
                   questionsEl.append(card);
                 }
         

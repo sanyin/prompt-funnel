@@ -48,8 +48,14 @@ export function checkFidelity(spec: PromptSpec, body: string): FidelityReport {
   const allowed = `${source}\n${spec.meta.note ?? ''}`.toLowerCase();
   const issues: Issue[] = [];
 
+  // Headings and list markers are scaffolding we wrote, not content: their
+  // numbers would otherwise read as invented literals.
+  const scanned = body
+    .replace(/^#{1,6}.*$/gmu, '')
+    .replace(/^\s*\d+[.)、]\s+/gmu, '');
+
   const unverifiable: string[] = [];
-  for (const token of extractHardTokens(body)) {
+  for (const token of extractHardTokens(scanned)) {
     if (allowed.includes(token.value.toLowerCase())) continue;
     unverifiable.push(token.value);
     if (token.kind === 'number' || token.kind === 'url' || token.kind === 'path') {

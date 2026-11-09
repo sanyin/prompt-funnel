@@ -18,6 +18,7 @@ type Lang = 'zh' | 'en';
 
 interface Labels {
   objective: string;
+  task: string;
   output: string;
   outputOnly: string;
   role: string;
@@ -48,6 +49,7 @@ const LABELS: Record<Lang, Labels> = {
     objective: '目标',
     output: '输出格式',
     outputOnly: '只输出 JSON，不要任何解释文字。',
+    task: '任务',
     role: '角色',
     examples: '示例',
     exampleIn: '输入',
@@ -74,6 +76,7 @@ const LABELS: Record<Lang, Labels> = {
     objective: 'Objective',
     output: 'Output format',
     outputOnly: 'Output JSON and nothing else.',
+    task: 'Task',
     role: 'Role',
     examples: 'Examples',
     exampleIn: 'input',
@@ -371,6 +374,56 @@ function renderChat(spec: PromptSpec, labels: Labels): string[] {
   return [paragraphs.join('\n\n')];
 }
 
+/**
+ * `template`: the five-part production template, as a document.
+ *
+ * Role / task / context / examples / output format, in that order, because that
+ * is the shape people are taught to write and the one they ask for by name.
+ * `chat` stays the default for pasting into a chat box; this one is for a
+ * prompt that will be kept, shared or versioned.
+ */
+function renderTemplate(spec: PromptSpec, labels: Labels): string[] {
+  const out: string[] = [];
+  const zh = labels.colon === '：';
+  const role = roleLine(spec, labels);
+
+  out.push(`## 1. ${labels.role}`, '', role ?? (zh ? '（未指定，按通用助手回答）' : '(not specified)'), '');
+  out.push(`## 2. ${labels.task}`, '', itemText(spec.objective, labels), '');
+  spec.requirements.forEach((requirement, index) => out.push(`${index + 1}. ${line(requirement, labels)}`));
+  if (spec.requirements.length > 0) out.push('');
+
+  out.push(`## 3. ${labels.context}`, '');
+  const context = contextLines(spec, labels);
+  out.push(...(context.length > 0 ? context : [zh ? '（无额外背景）' : '(none)']), '');
+  const constraints = [...spec.constraints, ...spec.nonGoals];
+  if (constraints.length > 0) {
+    for (const item of constraints) out.push(`- ${line(item, labels)}`);
+    out.push('');
+  }
+
+  out.push(`## 4. ${labels.examples}`, '');
+  const examples = exampleLines(spec, labels);
+  out.push(...(examples.length > 0 ? examples.map((entry) => `- ${entry}`) : [zh ? '（未提供）' : '(none)']), '');
+
+  out.push(`## 5. ${labels.output}`, '');
+  const output = outputLine(spec, labels);
+  const deliverable = deliverableLines(spec, labels);
+  out.push(...deliverable);
+  if (output !== undefined) out.push(`- ${output}`);
+  if (deliverable.length === 0 && output === undefined) out.push(zh ? '（未指定）' : '(not specified)');
+  out.push('');
+
+  if (spec.acceptance.length > 0) {
+    out.push(`## ${labels.acceptance}`, '');
+    for (const item of spec.acceptance) out.push(`- [ ] ${line(item, labels)}`);
+    out.push('');
+  }
+  if (spec.openQuestions.length > 0 || spec.assumptions.length > 0) {
+    out.push(...section(labels.questions, assumptionBody(spec, labels)));
+  }
+  return out;
+}
+
 /** Decide whether to re-attach the source text. */
 export function shouldKeepOriginal(spec: PromptSpec, mode: 'auto' | 'on' | 'off'): boolean {
   if (mode === 'on') return true;
@@ -393,7 +446,9 @@ export function renderSpec(
   const labels = LABELS[renderLanguage(spec.meta.source)];
 
   const body =
-    style === 'chat'
+    style === 'template'
+      ? renderTemplate(spec, labels)
+      : style === 'chat'
       ? renderChat(spec, labels)
       : style === 'compact'
         ? renderCompact(spec, labels)

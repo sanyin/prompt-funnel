@@ -102,8 +102,8 @@ test('picking an axis pins the novelty instead of leaving it to the model', () =
 test('asking for directions becomes a requirement, not a constraint', () => {
   const spec = analyzeWithRules('要有新意，有竞争力');
   const next = answerQuestion(spec, 'quality', '先给我三个方向选');
-  assert.ok(next.requirements.some((item) => item.text.includes('先给 3 个方向')));
-  assert.ok(!next.constraints.some((item) => item.text.includes('先给 3 个方向')));
+  assert.ok(next.requirements.some((item) => item.text.includes('先给三个方向')));
+  assert.ok(!next.constraints.some((item) => item.text.includes('先给三个方向')));
 });
 
 test('a request without hollow praise gets no quality question', () => {

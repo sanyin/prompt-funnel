@@ -98,7 +98,7 @@ export function answerQuestion(spec: PromptSpec, id: string, answer: string | An
       if (ASK_FOR_OPTIONS.test(text)) {
         next.requirements = renumber([
           ...next.requirements,
-          { id: 'R?', text: '先给 3 个方向，各一句话说明取舍，等我选定再展开', source: 'user' },
+          { id: 'R?', text: '先给三个方向，各一句话说明取舍，等我选定再展开', source: 'user' },
         ]);
       } else {
         next.constraints.push({ text: `「新意 / 竞争力」的落点：${text}`, source: 'user' });
@@ -126,7 +126,7 @@ export function answerQuestion(spec: PromptSpec, id: string, answer: string | An
       } else {
         next.requirements = renumber([
           ...next.requirements,
-          { id: 'R?', text: '先给 2–3 个方案让我对比，再选一个执行', source: 'user' },
+          { id: 'R?', text: '先给两三个方案让我对比，再选一个执行', source: 'user' },
         ]);
       }
       break;

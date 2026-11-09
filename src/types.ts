@@ -144,7 +144,7 @@ export interface AnswerValue {
   custom?: string;
 }
 
-export type StyleName = 'bluf' | 'compact' | 'checklist' | 'chat';
+export type StyleName = 'bluf' | 'compact' | 'checklist' | 'chat' | 'template';
 
 /** One problem found while validating a spec or its rendering. */
 export interface Issue {
