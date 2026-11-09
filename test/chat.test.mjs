@@ -86,3 +86,42 @@ test('background material is carried verbatim and rendered as context', () => {
   assert.match(text, /背景：TypeError at app\.ts:12/);
   assert.match(text, /帮我看看为什么报错/);
 });
+
+test('short background stays a plain line', () => {
+  const spec = analyzeWithRules('帮我看看为什么报错');
+  spec.context = [{ text: 'TypeError at app.ts:12', source: 'user' }];
+  const text = renderSpec(spec, { style: 'chat' }).text;
+  assert.match(text, /^背景：TypeError/m);
+  assert.doesNotMatch(text, /<context>/u);
+});
+
+test('a long paste is wrapped so the model can tell it from the ask', () => {
+  const spec = analyzeWithRules('帮我看看为什么报错');
+  spec.context = [{ text: 'x'.repeat(240), source: 'user' }];
+  const text = renderSpec(spec, { style: 'chat' }).text;
+  assert.match(text, /^<context>/m);
+  assert.match(text, /<\/context>/u);
+  assert.doesNotMatch(text, /^背景：/m);
+});
+
+test('several background documents get their own tags', () => {
+  const spec = analyzeWithRules('帮我看看为什么报错');
+  spec.context = [
+    { text: 'first', source: 'user' },
+    { text: 'second', source: 'user' },
+  ];
+  const text = renderSpec(spec, { style: 'bluf' }).text;
+  assert.equal((text.match(/<document>/gu) ?? []).length, 2);
+  assert.match(text, /<context>[\s\S]*first[\s\S]*second[\s\S]*<\/context>/u);
+});
+
+test('wrapping invents no literals, so fidelity still passes', () => {
+  const spec = analyzeWithRules('帮我看看为什么报错');
+  spec.context = [{ text: 'a'.repeat(240), source: 'user' }];
+  spec.meta.source = 'a'.repeat(240);
+  const result = renderSpec(spec, { style: 'chat' });
+  assert.deepEqual(
+    result.fidelity.issues.filter((issue) => issue.severity === 'error'),
+    [],
+  );
+});

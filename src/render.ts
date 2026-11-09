@@ -126,6 +126,31 @@ function exampleLines(spec: PromptSpec, labels: Labels): string[] {
   );
 }
 
+/** Long pasted background is wrapped so the model can tell it apart from the ask. */
+const CONTEXT_WRAP_AT = 200;
+
+function contextWrapped(spec: PromptSpec): boolean {
+  const texts = spec.context.map((item) => item.text.trim()).filter((text) => text.length > 0);
+  const total = texts.reduce((sum, text) => sum + text.length, 0);
+  return total >= CONTEXT_WRAP_AT || texts.length >= 2;
+}
+
+/**
+ * Background as prompt-ready lines.
+ *
+ * A plain "背景：" heading is a convention only a human reads. Models are trained
+ * on markup, so a long paste is put inside <context> — the same advice the
+ * prompt guides give, and the difference grows with document length.
+ */
+function contextLines(spec: PromptSpec, labels: Labels): string[] {
+  const texts = spec.context.map((item) => item.text.trim()).filter((text) => text.length > 0);
+  if (texts.length === 0) return [];
+  if (!contextWrapped(spec)) return texts.map((text) => `- ${text}`);
+
+  const body = texts.length === 1 ? texts : texts.flatMap((text) => ['<document>', text, '</document>']);
+  return ['<context>', ...body, '</context>'];
+}
+
 /** The default assumptions block, shared by every style. */
 function assumptionBody(spec: PromptSpec, labels: Labels): string[] {
   const block: string[] = [];
@@ -162,7 +187,7 @@ function renderBluf(spec: PromptSpec, labels: Labels): string[] {
 
   out.push(`## ${labels.objective}`, '', itemText(spec.objective, labels), '');
 
-  out.push(...section(labels.context, spec.context.map((item) => `- ${line(item, labels)}`)));
+  out.push(...section(labels.context, contextLines(spec, labels)));
   out.push(...section(labels.examples, exampleLines(spec, labels).map((entry) => `- ${entry}`)));
 
   if (spec.requirements.length > 0) {
@@ -256,8 +281,8 @@ function renderChat(spec: PromptSpec, labels: Labels): string[] {
   const paragraphs: string[] = [];
 
   if (spec.context.length > 0) {
-    const body = spec.context.map((item) => item.text.trim()).join(zh ? '\n' : '\n');
-    paragraphs.push(`${labels.context}${labels.colon}${body}`);
+    const body = spec.context.map((item) => item.text.trim()).join('\n');
+    paragraphs.push(contextWrapped(spec) ? `<context>\n${body}\n</context>` : `${labels.context}${labels.colon}${body}`);
   }
 
   const role = roleLine(spec, labels);
