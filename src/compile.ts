@@ -56,6 +56,12 @@ export async function compile(raw: string, options: CompileOptions = {}, deps: C
   base.meta.style = style;
   if (options.role !== undefined && options.role.trim().length > 0) {
     base.role = { text: options.role.trim(), source: 'user' };
+    // Asking for a role that was just supplied would contradict the prompt.
+    const gap = base.assumptions.find((assumption) => assumption.gap?.id === 'role');
+    if (gap !== undefined) {
+      base.assumptions = base.assumptions.filter((assumption) => assumption !== gap);
+      base.openQuestions = base.openQuestions.filter((question) => question !== gap.gap?.question);
+    }
   }
   if (options.examples !== undefined) {
     const pairs = options.examples

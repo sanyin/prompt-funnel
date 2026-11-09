@@ -100,6 +100,8 @@ export interface PromptSpec {
   context: Item[];
   /** Who the model should act as, when expertise changes the answer. */
   role?: Item;
+  /** How the model should work (plan first, reason first, ground in the text). */
+  execution?: Item[];
   /** Machine-readable output the caller asked for. */
   output?: { kind: 'json'; fields: string[] };
   /** Input/output pairs showing the shape of the wanted result. */

@@ -21,6 +21,10 @@ interface Labels {
   task: string;
   output: string;
   outputOnly: string;
+  execution: string;
+  grounding: string;
+  uncertainty: string;
+  tools: string;
   role: string;
   examples: string;
   exampleIn: string;
@@ -48,6 +52,10 @@ const LABELS: Record<Lang, Labels> = {
   zh: {
     objective: '目标',
     output: '输出格式',
+    execution: '执行方式',
+    grounding: '只依据上面「背景与约束」里的信息回答；里面没有的，直接说没有，不要补。',
+    uncertainty: '不确定的地方直接说不确定，不要用听起来笃定的措辞填空。',
+    tools: '需要实时数据或计算结果时，先说明你需要哪些工具或数据，不要凭记忆补一个数。',
     outputOnly: '只输出 JSON，不要任何解释文字。',
     task: '任务',
     role: '角色',
@@ -75,6 +83,10 @@ const LABELS: Record<Lang, Labels> = {
   en: {
     objective: 'Objective',
     output: 'Output format',
+    execution: 'How to work',
+    grounding: 'Answer only from the background above; if it is not there, say so instead of filling it in.',
+    uncertainty: 'Where you are unsure, say you are unsure rather than sounding certain.',
+    tools: 'When you need live data or a computation, say which tool or input you need instead of recalling a number.',
     outputOnly: 'Output JSON and nothing else.',
     task: 'Task',
     role: 'Role',
@@ -160,6 +172,21 @@ function contextLines(spec: PromptSpec, labels: Labels): string[] {
   return ['<context>', ...body, '</context>'];
 }
 
+/**
+ * The block that turns "write a better prompt" into "work in this order".
+ *
+ * OpenAI's strategies three and four are decomposition and giving the model room
+ * to reason; both are one explicit instruction, and both are useless buried
+ * inside the task list.
+ */
+function executionLines(spec: PromptSpec, labels: Labels): string[] {
+  const lines = (spec.execution ?? []).map((item) => `- ${item.text}`);
+  if (spec.context.length > 0) lines.push(`- ${labels.grounding}`);
+  lines.push(`- ${labels.uncertainty}`);
+  lines.push(`- ${labels.tools}`);
+  return lines;
+}
+
 /** A JSON contract, when the caller asked for machine-readable output. */
 function outputLine(spec: PromptSpec, labels: Labels): string | undefined {
   if (spec.output === undefined) return undefined;
@@ -220,6 +247,8 @@ function renderBluf(spec: PromptSpec, labels: Labels): string[] {
     out.push('');
   }
 
+  out.push(...section(labels.execution, executionLines(spec, labels)));
+
   out.push(
     ...section(labels.constraints, spec.constraints.map((item) => `- ${line(item, labels)}`)),
     ...section(labels.nonGoals, spec.nonGoals.map((item) => `- ${line(item, labels)}`)),
@@ -263,6 +292,7 @@ function renderCompact(spec: PromptSpec, labels: Labels): string[] {
   );
   const output = outputLine(spec, labels);
   if (output !== undefined) bullet(labels.output, [output]);
+  bullet(labels.execution, executionLines(spec, labels).map((entry) => entry.replace(/^- /u, '')));
   bullet(labels.acceptance, spec.acceptance.map((item) => line(item, labels)));
   bullet(labels.questions, [...spec.openQuestions, ...spec.assumptions.map((item) => item.text)]);
   return out;
@@ -284,6 +314,7 @@ function renderChecklist(spec: PromptSpec, labels: Labels): string[] {
   for (const entry of deliverableLines(spec, labels)) out.push(`- [ ] ${entry.replace(/^- /u, '')}`);
   const output = outputLine(spec, labels);
   if (output !== undefined) out.push(`- [ ] ${kv(labels.output, output, labels)}`);
+  for (const entry of executionLines(spec, labels)) out.push(`- [ ] ${kv(labels.execution, entry.replace(/^- /u, ''), labels)}`);
   for (const item of spec.acceptance) out.push(`- [ ] ${kv(labels.acceptance, line(item, labels), labels)}`);
   if (spec.openQuestions.length > 0) {
     out.push(`- [ ] ${kv(labels.questions, spec.openQuestions.join('；'), labels)}`);
@@ -350,6 +381,9 @@ function renderChat(spec: PromptSpec, labels: Labels): string[] {
   // as things the model may choose — not as things the user said.
   const output = outputLine(spec, labels);
   if (output !== undefined) paragraphs.push(output);
+  const howTo = executionLines(spec, labels).map((entry) => entry.replace(/^- /u, '')).join(sep);
+  // The clauses already end in a full stop; adding another produced "。。".
+  paragraphs.push(/[。.]$/u.test(howTo) ? howTo : howTo + (zh ? '。' : '.'));
 
   const examples = exampleLines(spec, labels);
   if (examples.length > 0) paragraphs.push(`${labels.examples}${labels.colon}${examples.join(sep)}`);
@@ -419,6 +453,8 @@ function renderTemplate(spec: PromptSpec, labels: Labels): string[] {
     out.push(zh ? `_未指定：${missing.join('、')}_` : `_Not specified: ${missing.join(', ')}_`, '');
   }
 
+  out.push(`## ${labels.execution}`, ...executionLines(spec, labels), '');
+
   if (spec.acceptance.length > 0) {
     out.push(`## ${labels.acceptance}`, '');
     for (const item of spec.acceptance) out.push(`- [ ] ${line(item, labels)}`);
@@ -464,7 +500,8 @@ export function renderSpec(
 
   // A chat message with an appendix is not a chat message. Only an explicit
   // `on` re-attaches the source in this style.
-  const keepMode = style === 'chat' ? (options.keepOriginal ?? 'off') : (options.keepOriginal ?? 'auto');
+  const keepMode =
+    style === 'chat' || style === 'template' ? (options.keepOriginal ?? 'off') : (options.keepOriginal ?? 'auto');
   const keptOriginal = shouldKeepOriginal(spec, keepMode);
   const text = body
     .filter((entry, index, array) => !(entry === '' && array[index - 1] === ''))

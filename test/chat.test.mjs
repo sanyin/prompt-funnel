@@ -14,7 +14,8 @@ test('chat style has no headings and reads as one message', () => {
   const text = renderSpec(spec(), { style: 'chat' }).text;
   assert.doesNotMatch(text, /^## /mu);
   assert.doesNotMatch(text, /- \[ \]/u);
-  assert.ok(text.trim().split('\n\n').length <= 3, 'chat output should be two or three paragraphs');
+  assert.doesNotMatch(text, /。。/u, 'no doubled punctuation');
+  assert.ok(text.trim().split('\n\n').length <= 4, 'chat output should stay a short message');
 });
 
 test('chat style is materially shorter than the structured default', () => {
@@ -124,4 +125,37 @@ test('wrapping invents no literals, so fidelity still passes', () => {
     result.fidelity.issues.filter((issue) => issue.severity === 'error'),
     [],
   );
+});
+
+test('the deliverable says how to work, not just what to do', () => {
+  const spec = analyzeWithRules('帮我看看这个报错为什么不生效');
+  const text = renderSpec(spec, { style: 'template' }).text;
+  assert.match(text, /## 执行方式/);
+  assert.match(text, /不确定的地方直接说不确定/);
+  assert.match(text, /需要实时数据或计算结果时/);
+});
+
+test('grounding in the provided text only appears when text was provided', () => {
+  const bare = analyzeWithRules('帮我看看这个报错');
+  assert.doesNotMatch(renderSpec(bare, { style: 'template' }).text, /只依据上面/);
+
+  const withContext = analyzeWithRules('帮我看看这个报错');
+  withContext.context = [{ text: 'TypeError at app.ts:12', source: 'user' }];
+  assert.match(renderSpec(withContext, { style: 'template' }).text, /只依据上面/);
+});
+
+test('the template keeps canonical numbers even with gaps', () => {
+  const spec = analyzeWithRules('帮我看看这个报错');
+  const text = renderSpec(spec, { style: 'template' }).text;
+  assert.match(text, /## 2\. 任务/);
+  assert.match(text, /## 5\. 输出格式/);
+  assert.match(text, /_未指定：/);
+});
+
+test('a role written in the sentence is used, not asked for again', () => {
+  const spec = analyzeWithRules('你是一个资深程序员，帮我看看这个报错');
+  assert.equal(spec.role?.text, '资深程序员');
+  assert.equal(spec.role?.source, 'user');
+  const text = renderSpec(spec, { style: 'template' }).text;
+  assert.match(text, /## 1\. 角色\n以「资深程序员」/);
 });

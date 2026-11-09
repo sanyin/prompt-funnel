@@ -317,6 +317,8 @@
           <div class="status" id="status"></div>
           <div class="row-chips" id="strict-row">
             <button class="chip" id="strict" aria-pressed="false">☐ 要它说实话</button>
+            <button class="chip" id="plan-first" aria-pressed="false">☐ 先给计划</button>
+            <button class="chip" id="reason-first" aria-pressed="false">☐ 先写推理</button>
           </div>
 
           <div class="answers" id="answers"></div>
@@ -419,7 +421,9 @@
               const finalized = new Set();
               /** Which text the cache belongs to: answers must survive re-renders. */
               let cacheText = null;
-          /** One optional input/output pair, kept outside the question model. */
+          /** Two switches that map to decomposition and reasoning. */
+      const approach = { plan: false, reason: false };
+      /** One optional input/output pair, kept outside the question model. */
           const examplePair = { input: '', output: '' };
           /** JSON field names; an explicit ask that also forces compilation. */
           let jsonFields = '';
@@ -709,7 +713,9 @@
                 }
                 for (const [id, answer] of answers) spec = answerQuestion(spec, id, answer);
             if (pairReady) spec.examples = [{ input: examplePair.input.trim(), output: examplePair.output.trim() }];
-            const fields = jsonFields.split(/[,，]/u).map((f) => f.trim()).filter(Boolean);
+            if (approach.plan) spec.execution = [...(spec.execution ?? []), { text: '先给分步计划，等我确认后再展开', source: 'user' }];
+        if (approach.reason) spec.execution = [...(spec.execution ?? []), { text: '先写出推理过程，再给最终结论', source: 'user' }];
+        const fields = jsonFields.split(/[,，]/u).map((f) => f.trim()).filter(Boolean);
             if (jsonFields.trim().length > 0) {
               spec.output = fields.length > 0 ? { kind: 'json', fields } : { kind: 'json', fields: [] };
             }
@@ -854,7 +860,19 @@
             render();
           });
     
-          const fmtButtons = [...document.querySelectorAll('[data-fmt]')];
+          function wireApproach(id, key, label) {
+        const button = document.getElementById(id);
+        button.addEventListener('click', () => {
+          approach[key] = !approach[key];
+          button.textContent = (approach[key] ? '☑ ' : '☐ ') + label;
+          button.setAttribute('aria-pressed', approach[key] ? 'true' : 'false');
+          render();
+        });
+      }
+      wireApproach('plan-first', 'plan', '先给计划');
+      wireApproach('reason-first', 'reason', '先写推理');
+
+      const fmtButtons = [...document.querySelectorAll('[data-fmt]')];
       function syncFormat() {
         for (const button of fmtButtons) {
           button.classList.toggle('on', button.dataset.fmt === styleSel.value);

@@ -214,10 +214,11 @@ test('"no role" is an answer, not a role', () => {
   assert.equal(next.role, undefined);
 });
 
-test('saying "plan first" adds a requirement, not a constraint', () => {
+test('saying "plan first" lands in how-to-work, not in the task list', () => {
   const spec = analyzeWithRules('帮我做一个后台管理系统');
   const next = answerQuestion(spec, 'approach', '先给计划，我确认后再做');
-  assert.ok(next.requirements.some((item) => item.text.includes('先给步骤计划')));
+  assert.ok((next.execution ?? []).some((item) => item.text.includes('分步计划')));
+  assert.ok(!next.requirements.some((item) => item.text.includes('分步计划')));
 });
 
 test('a role and an example survive into the chat rendering', () => {

@@ -77,6 +77,7 @@ export function answerQuestion(spec: PromptSpec, id: string, answer: string | An
     deliverable: { ...spec.deliverable },
     assumptions: spec.assumptions.filter((assumption) => assumption !== target),
     openQuestions: spec.openQuestions.filter((question) => question !== target.gap?.question),
+    execution: [...(spec.execution ?? [])],
     meta: { ...spec.meta },
   };
   const items = parts.map((part) => ({ text: part, source: 'user' as const }));
@@ -119,15 +120,11 @@ export function answerQuestion(spec: PromptSpec, id: string, answer: string | An
       if (/^(?:直接做|Just do it)/u.test(text)) {
         // Doing it directly is the default; saying so adds nothing to the prompt.
       } else if (/计划/u.test(text)) {
-        next.requirements = renumber([
-          ...next.requirements,
-          { id: 'R?', text: '先给步骤计划，等我确认后再执行', source: 'user' },
-        ]);
+        next.execution = [...(next.execution ?? []), { text: '先给分步计划，等我确认后再展开', source: 'user' }];
+      } else if (/推理/u.test(text)) {
+        next.execution = [...(next.execution ?? []), { text: '先写出推理过程，再给最终结论', source: 'user' }];
       } else {
-        next.requirements = renumber([
-          ...next.requirements,
-          { id: 'R?', text: '先给两三个方案让我对比，再选一个执行', source: 'user' },
-        ]);
+        next.execution = [...(next.execution ?? []), { text: '先给两三个方案让我对比，再选一个执行', source: 'user' }];
       }
       break;
     case 'rubric':
