@@ -165,3 +165,34 @@ test('a plain string answer still works (backwards compatible)', () => {
   const next = answerQuestion(vague(), 'format', '一份清单或表格');
   assert.equal(next.deliverable.format?.text, '一份清单或表格');
 });
+
+test('coursework gets a marking-scheme question, and no engineering safety rails', () => {
+  const spec = analyzeWithRules('帮我写一篇关于向量数据库的课程论文');
+  const ids = questionsFor(spec).map((q) => q.id);
+  assert.ok(ids.includes('rubric'), ids.join(','));
+  assert.ok(!ids.includes('forbidden'), 'student work should not ask about interfaces');
+  assert.equal(spec.intent, 'write');
+});
+
+test('engineering work gets an out-of-scope question', () => {
+  const spec = analyzeWithRules('这个接口报错了，帮我修');
+  const ids = questionsFor(spec).map((q) => q.id);
+  assert.ok(ids.includes('forbidden'), ids.join(','));
+  assert.ok(!ids.includes('rubric'));
+});
+
+test('a marking scheme is captured as one constraint, not one line per pick', () => {
+  const spec = analyzeWithRules('帮我写一篇关于向量数据库的课程论文');
+  const next = answerQuestion(spec, 'rubric', { values: ['字数有硬性要求', '要附参考文献 / 引用格式'] });
+  const marked = next.constraints.filter((item) => item.text.startsWith('评分标准：'));
+  assert.equal(marked.length, 1);
+  assert.match(marked[0].text, /字数有硬性要求/);
+  assert.match(marked[0].text, /参考文献/);
+});
+
+test('"do not touch" answers land out of scope, not in the requirements', () => {
+  const spec = analyzeWithRules('这个接口报错了，帮我修');
+  const next = answerQuestion(spec, 'forbidden', { values: ['不许改现有接口', '不许加新依赖'] });
+  assert.equal(next.nonGoals.length, 2);
+  assert.ok(!next.requirements.some((item) => item.text.includes('不许改现有接口')));
+});

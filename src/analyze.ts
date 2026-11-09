@@ -288,6 +288,11 @@ interface Gap {
 const HOLLOW_QUALITY =
   /(?:新意|新颖|创新|竞争力|亮点|高级感|高大上|有质感|惊艳|爆款|别具一格|与众不同)/u;
 
+/** Words that say this is coursework rather than engineering. */
+const STUDENT_RE = /(?:作业|论文|课程|实验报告|答辩|开题|绩点|老师|教授|导师|学校|学期|期末|文献综述|引用|参考文献)/iu;
+/** Words that say this is engineering work. */
+const DEV_RE = /(?:代码|接口|仓库|函数|报错|异常|部署|依赖|数据库|重构|单元测试|编译|api|bug|docker|git)/iu;
+
 /**
  * Answer choices for each gap.
  *
@@ -304,6 +309,9 @@ const GAP_OPTIONS: Record<Lang, Record<string, string[]>> = {
     stack: ['沿用现有技术栈', 'TypeScript / Node', 'Python', '不确定，你来选'],
     quality: ['玩法 / 规则上的新', '视觉 / 氛围上的新', '技术实现上的新', '先给我三个方向选'],
     failure: ['做出来不能用', '能用，但不是我想的样子', '方向对，但太粗糙', '我也说不上来'],
+    rubric: ['老师有评分表（我贴给你）', '字数有硬性要求', '要附参考文献 / 引用格式', '要能讲清推导过程', '不能看起来像 AI 写的'],
+    forbidden: ['不许改现有接口', '不许加新依赖', '不许动数据库结构', '先别写代码，只给方案'],
+    repro: ['本机 Node 22', 'Docker 里跑', '公司 / 学校的内网环境', '不确定，按最常见的来'],
   },
   en: {
     audience: ['A complete beginner', 'Someone with basics', 'A domain expert', 'Someone deciding something'],
@@ -313,6 +321,9 @@ const GAP_OPTIONS: Record<Lang, Record<string, string[]>> = {
     stack: ['The existing stack', 'TypeScript / Node', 'Python', 'Not sure, you pick'],
     quality: ['New mechanics', 'New look and feel', 'New technical approach', 'Give me three directions first'],
     failure: ['It does not run', 'It runs but is not what I meant', 'Right direction, too rough', 'I cannot say'],
+    rubric: ['There is a marking rubric (I will paste it)', 'A hard word limit', 'References / citation style required', 'Show the derivation', 'It must not read as AI-written'],
+    forbidden: ['Do not change the existing interface', 'No new dependencies', 'Do not touch the schema', 'Do not write code yet, plan first'],
+    repro: ['Node 22 on my machine', 'Inside Docker', 'A locked-down work network', 'Not sure, use the usual'],
   },
 };
 
@@ -387,6 +398,42 @@ function collectGaps(
           lang === 'zh'
             ? '不说清什么算失败，模型不会主动避开它'
             : 'A failure you never named is one the model will not avoid',
+      },
+    });
+  }
+  if (STUDENT_RE.test(raw)) {
+    gaps.push({
+      id: 'rubric',
+      rank: 2,
+      multi: true,
+      question: lang === 'zh' ? '这份东西按什么标准评？' : 'How will this be marked?',
+      options: GAP_OPTIONS[lang].rubric ?? [],
+      assumption: {
+        text: lang === 'zh' ? '按「读得懂、能自圆其说」处理' : 'Readable and defensible',
+        impact: lang === 'zh' ? '不说评分标准，模型会按「看起来专业」来写' : 'It will optimise for sounding competent',
+      },
+    });
+  }
+  if (DEV_RE.test(raw) && !STUDENT_RE.test(raw)) {
+    gaps.push({
+      id: 'forbidden',
+      rank: 2,
+      multi: true,
+      question: lang === 'zh' ? '有什么是不能动的？' : 'What must not be touched?',
+      options: GAP_OPTIONS[lang].forbidden ?? [],
+      assumption: {
+        text: lang === 'zh' ? '没说不许动，就按改动最小的方式做' : 'Minimal change',
+        impact: lang === 'zh' ? '不说禁区，模型可能顺手重构你不想动的地方' : 'It may refactor things you wanted left alone',
+      },
+    });
+    gaps.push({
+      id: 'repro',
+      rank: 3,
+      question: lang === 'zh' ? '在什么环境里跑？' : 'Which environment?',
+      options: GAP_OPTIONS[lang].repro ?? [],
+      assumption: {
+        text: lang === 'zh' ? '按最常见的环境处理' : 'The usual environment',
+        impact: lang === 'zh' ? '环境不符，代码在你这儿跑不起来' : 'It may not run where you are',
       },
     });
   }

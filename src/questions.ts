@@ -80,6 +80,7 @@ export function answerQuestion(spec: PromptSpec, id: string, answer: string | An
     meta: { ...spec.meta },
   };
   const items = parts.map((part) => ({ text: part, source: 'user' as const }));
+  const labels = { join: /[\u4e00-\u9fa5]/u.test(text) ? '、' : ', ' };
 
   switch (id) {
     case 'audience':
@@ -109,6 +110,19 @@ export function answerQuestion(spec: PromptSpec, id: string, answer: string | An
       for (const part of parts) {
         if (!NO_FAILURE_STATED.test(part)) next.acceptance.push({ text: `不出现：${part}`, source: 'user' });
       }
+      break;
+    case 'rubric':
+      // A marking scheme is a constraint, not a requirement: it says what the
+      // artefact must satisfy, not what to build.
+      next.constraints.push({ text: `评分标准：${parts.join(labels.join)}`, source: 'user' });
+      break;
+    case 'forbidden':
+      // "Do not touch X" belongs in out-of-scope, where the renderer shows it
+      // separately from the work to be done.
+      for (const part of parts) next.nonGoals.push({ text: part, source: 'user' });
+      break;
+    case 'repro':
+      next.constraints.push({ text: `运行环境：${parts.join(labels.join)}`, source: 'user' });
       break;
     case 'scope':
       // Scope choices narrow the work; they belong with the constraints, not the

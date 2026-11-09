@@ -67,7 +67,7 @@ export function detectIntent(text: string): IntentClass {
   // "写" alone is not writing: "写一个爬虫" is an engineering task. Require a
   // text artifact to be named before calling this a writing request.
   const isCode = /(?:代码|函数|脚本|接口|组件|测试|仓库|repo|code|function|script|component|api|test)/iu.test(text);
-  const textArtifact = /(?:文章|文案|报告|邮件|总结|说明文档|演讲稿|提纲|大纲|稿件|读后感|essay|email|article|report|summary|outline|post)/iu.test(text);
+  const textArtifact = /(?:文章|文案|报告|邮件|总结|说明文档|演讲稿|提纲|大纲|稿件|读后感|论文|综述|开题|答辩|essay|email|article|report|summary|outline|post)/iu.test(text);
   const writeVerb = /(?:写|撰写|润色|改写|翻译|起草|draft|write|rewrite|proofread|translate|summari[sz]e)/iu.test(text);
   if (!isCode && textArtifact && writeVerb) return 'write';
   if (/(?:计划|方案|规划|路线图|步骤|拆解|里程碑|排期|roadmap|plan|strategy|milestones|schedule)/iu.test(text)) {
