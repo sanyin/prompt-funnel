@@ -198,6 +198,25 @@ MCP 只做确定性的事（判定 / 分析 / 校验 / 渲染），**语义工�
 | `funnel_ideas` | 手写方向库：卡壳时给三条候选 |
 | `funnel_compile` | 一步到位 |
 
+## 两个独立工具
+
+核心之外，`tools/` 里有两个和编译器分开的小工具——不共享状态，可以单独用。
+
+**保锚压缩**（`tools/compact/`）：长会话撞上下文墙时，整段删而不是让模型摘要。凡带路径 / URL / 标识符的段落一律保留，压完再验证一遍。
+
+```bash
+node tools/compact/cli.mjs transcript.md --budget 120
+# 单元 10 → 6，tokens 295 → 139（-53%）
+# 必须原样保留的字面量 2 个，缺失 0 个
+```
+
+**决策日志**（`tools/decision-log/`）：仓库里一个 `.decisions.md`，记「试过什么、为什么放弃、什么条件下可以重试」，带一个 MCP server 让 agent 开工前先查——重复撞同一堵墙是最贵的浪费。
+
+```bash
+node tools/decision-log/cli.mjs add --topic "Redis 队列" --reason "公司没有实例，运维不批"
+node tools/decision-log/mcp.mjs --root .
+```
+
 ## 四个设计决定
 
 **1. 闸门，不是网关。** 大部分消息本来就清楚，逐条重写要付延迟、token 和信任三重代价。清晰的请求原样放行——字节相同，有测试断言。

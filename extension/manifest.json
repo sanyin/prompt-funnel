@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "prompt-funnel · 把话问清楚",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "在发送前告诉你这句话缺什么：点两下补上，再发出去。全部本地完成，不联网。",
   "background": {
     "service_worker": "background.js",
