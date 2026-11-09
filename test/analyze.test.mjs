@@ -39,9 +39,9 @@ test('code fences become anchors and stay byte-identical', () => {
   assert.ok(spec.anchors.some((anchor) => anchor.includes('arr.filter(Boolean)')));
 });
 
-test('open questions are capped at three', () => {
+test('open questions are capped at four', () => {
   const spec = analyzeWithRules('帮我做一个后台管理系统，同时把数据也迁移过来，另外写一份文档');
-  assert.ok(spec.openQuestions.length <= 3);
+  assert.ok(spec.openQuestions.length <= 4);
   assert.ok(spec.assumptions.length >= spec.openQuestions.length);
 });
 

@@ -54,6 +54,16 @@ export async function compile(raw: string, options: CompileOptions = {}, deps: C
 
   const base = analyzeWithRules(request, verdict, options);
   base.meta.style = style;
+  if (options.role !== undefined && options.role.trim().length > 0) {
+    base.role = { text: options.role.trim(), source: 'user' };
+  }
+  if (options.examples !== undefined) {
+    const pairs = options.examples
+      .map((line) => line.split(/=>|→/u))
+      .map(([input, output]) => ({ input: (input ?? '').trim(), output: (output ?? '').trim() }))
+      .filter((pair) => pair.input.length > 0 && pair.output.length > 0);
+    if (pairs.length > 0) base.examples = pairs;
+  }
   if (split.separated) {
     // The context is carried verbatim; the request is what gets analysed. The
     // fidelity check still runs against everything the user pasted.
@@ -61,7 +71,10 @@ export async function compile(raw: string, options: CompileOptions = {}, deps: C
     base.meta.source = source;
   }
 
-  if (options.force !== true && options.template === undefined && verdict.decision === 'pass') {
+  // Asking for a role or an example is an explicit instruction to compile:
+  // passing through would silently drop what the user just asked for.
+  const explicitStructure = options.role !== undefined || (options.examples?.length ?? 0) > 0;
+  if (options.force !== true && options.template === undefined && !explicitStructure && verdict.decision === 'pass') {
     const fidelity = checkFidelity(base, source);
     return {
       spec: base,

@@ -309,6 +309,8 @@ const GAP_OPTIONS: Record<Lang, Record<string, string[]>> = {
     stack: ['沿用现有技术栈', 'TypeScript / Node', 'Python', '不确定，你来选'],
     quality: ['玩法 / 规则上的新', '视觉 / 氛围上的新', '技术实现上的新', '先给我三个方向选'],
     failure: ['做出来不能用', '能用，但不是我想的样子', '方向对，但太粗糙', '我也说不上来'],
+    role: ['不需要，按通用助手来', '这行的资深从业者', '严格的评审者', '完全不懂这块的人（帮你检查是否说人话）'],
+    approach: ['直接做', '先给计划，我确认后再做', '先给两三个方案让我对比'],
     rubric: ['老师有评分表（我贴给你）', '字数有硬性要求', '要附参考文献 / 引用格式', '要能讲清推导过程', '不能看起来像 AI 写的'],
     forbidden: ['不许改现有接口', '不许加新依赖', '不许动数据库结构', '先别写代码，只给方案'],
     repro: ['本机 Node 22', 'Docker 里跑', '公司 / 学校的内网环境', '不确定，按最常见的来'],
@@ -321,6 +323,8 @@ const GAP_OPTIONS: Record<Lang, Record<string, string[]>> = {
     stack: ['The existing stack', 'TypeScript / Node', 'Python', 'Not sure, you pick'],
     quality: ['New mechanics', 'New look and feel', 'New technical approach', 'Give me three directions first'],
     failure: ['It does not run', 'It runs but is not what I meant', 'Right direction, too rough', 'I cannot say'],
+    role: ['No role, just a general assistant', 'A senior practitioner of this craft', 'A strict reviewer', 'Someone who knows nothing about this (checks if it reads)'],
+    approach: ['Just do it', 'Give me a plan first, then I confirm', 'Give me two or three options to compare'],
     rubric: ['There is a marking rubric (I will paste it)', 'A hard word limit', 'References / citation style required', 'Show the derivation', 'It must not read as AI-written'],
     forbidden: ['Do not change the existing interface', 'No new dependencies', 'Do not touch the schema', 'Do not write code yet, plan first'],
     repro: ['Node 22 on my machine', 'Inside Docker', 'A locked-down work network', 'Not sure, use the usual'],
@@ -398,6 +402,30 @@ function collectGaps(
           lang === 'zh'
             ? '不说清什么算失败，模型不会主动避开它'
             : 'A failure you never named is one the model will not avoid',
+      },
+    });
+  }
+  if (intent === 'plan' || intent === 'debug' || intent === 'answer') {
+    gaps.push({
+      id: 'role',
+      rank: 2,
+      question: lang === 'zh' ? '要它扮演谁？' : 'Who should answer?',
+      options: GAP_OPTIONS[lang].role ?? [],
+      assumption: {
+        text: lang === 'zh' ? '按通用助手回答' : 'A general assistant',
+        impact: lang === 'zh' ? '不给身份，回答的深度会按「普通人」来' : 'Depth will default to a general reader',
+      },
+    });
+  }
+  if (intent === 'execute' || intent === 'plan') {
+    gaps.push({
+      id: 'approach',
+      rank: 3,
+      question: lang === 'zh' ? '直接做，还是先给计划？' : 'Act now, or plan first?',
+      options: GAP_OPTIONS[lang].approach ?? [],
+      assumption: {
+        text: lang === 'zh' ? '直接给结果' : 'Do it directly',
+        impact: lang === 'zh' ? '不先说，方向错了要整体返工' : 'A wrong direction means rework',
       },
     });
   }
@@ -507,7 +535,12 @@ export function analyzeWithRules(raw: string, gateResult?: GateResult, options: 
   const constraints = toItems(units.filter((unit) => unit.role === 'constraint'));
   const nonGoals = toItems(units.filter((unit) => unit.role === 'non-goal'));
   const acceptance = toItems(units.filter((unit) => unit.role === 'acceptance'));
-  const context = toItems(units.filter((unit) => unit.role === 'context')).slice(0, 8);
+  // A single sentence cannot be both the ask and its own background: the
+  // classifier calls long sentences "context", which duplicated the objective.
+  const objectiveText = objective.item.text;
+  const context = toItems(units.filter((unit) => unit.role === 'context'))
+    .filter((item) => item.text !== objectiveText && !objectiveText.includes(item.text))
+    .slice(0, 8);
 
   const formatSentence = findDeliverableSentence(units);
   const deliverable: Deliverable = {};
@@ -521,7 +554,7 @@ export function analyzeWithRules(raw: string, gateResult?: GateResult, options: 
   // Gaps are pushed in rank order, so the first three are the ones worth a
   // round-trip. Rank decides *priority*, not eligibility: a third-tier gap still
   // gets asked when nothing more important is missing.
-  const asked = gaps.slice(0, 3);
+  const asked = [...gaps].sort((left, right) => left.rank - right.rank).slice(0, 4);
   const openQuestions = asked.map((gap) => gap.question);
   // Only the gaps that were actually asked become answerable in the UI; the rest
   // stay as silent defaults so the prompt never grows a fourth question.

@@ -18,6 +18,10 @@ type Lang = 'zh' | 'en';
 
 interface Labels {
   objective: string;
+  role: string;
+  examples: string;
+  exampleIn: string;
+  exampleOut: string;
   context: string;
   requirements: string;
   constraints: string;
@@ -40,6 +44,10 @@ interface Labels {
 const LABELS: Record<Lang, Labels> = {
   zh: {
     objective: '目标',
+    role: '角色',
+    examples: '示例',
+    exampleIn: '输入',
+    exampleOut: '输出',
     context: '背景',
     requirements: '要求',
     constraints: '约束',
@@ -60,6 +68,10 @@ const LABELS: Record<Lang, Labels> = {
   },
   en: {
     objective: 'Objective',
+    role: 'Role',
+    examples: 'Examples',
+    exampleIn: 'input',
+    exampleOut: 'output',
     context: 'Context',
     requirements: 'Requirements',
     constraints: 'Constraints',
@@ -98,6 +110,22 @@ function section(heading: string, body: string[]): string[] {
   return body.length === 0 ? [] : [`## ${heading}`, '', ...body, ''];
 }
 
+/** Role line, phrased as an instruction rather than a bare noun. */
+function roleLine(spec: PromptSpec, labels: Labels): string | undefined {
+  if (spec.role === undefined) return undefined;
+  const zh = labels.colon === '：';
+  const who = itemText(spec.role, labels);
+  return zh ? `以「${who}」的身份和深度来回答` : `Answer as ${who}`;
+}
+
+/** Few-shot pairs, rendered the way a person would write them. */
+function exampleLines(spec: PromptSpec, labels: Labels): string[] {
+  if (spec.examples === undefined || spec.examples.length === 0) return [];
+  return spec.examples.map(
+    (pair) => `${labels.exampleIn}${labels.colon}${pair.input.trim()} → ${labels.exampleOut}${labels.colon}${pair.output.trim()}`,
+  );
+}
+
 /** The default assumptions block, shared by every style. */
 function assumptionBody(spec: PromptSpec, labels: Labels): string[] {
   const block: string[] = [];
@@ -129,9 +157,13 @@ function renderBluf(spec: PromptSpec, labels: Labels): string[] {
   if (spec.carried !== undefined) {
     out.push(`## ${labels.carried}`, '', spec.carried.text.trim(), '');
   }
+  const role = roleLine(spec, labels);
+  if (role !== undefined) out.push(`## ${labels.role}`, '', role, '');
+
   out.push(`## ${labels.objective}`, '', itemText(spec.objective, labels), '');
 
   out.push(...section(labels.context, spec.context.map((item) => `- ${line(item, labels)}`)));
+  out.push(...section(labels.examples, exampleLines(spec, labels).map((entry) => `- ${entry}`)));
 
   if (spec.requirements.length > 0) {
     out.push(`## ${labels.requirements}`, '');
@@ -158,7 +190,11 @@ function renderCompact(spec: PromptSpec, labels: Labels): string[] {
   if (spec.carried !== undefined) {
     out.push(`**${labels.carried}**${labels.colon}${spec.carried.text.replace(/\s*\n\s*/gu, ' / ')}`);
   }
+  const role = roleLine(spec, labels);
+  if (role !== undefined) out.push(`**${labels.role}**${labels.colon}${role}`);
   out.push(`**${labels.objective}**${labels.colon}${itemText(spec.objective, labels)}`);
+  const examples = exampleLines(spec, labels);
+  if (examples.length > 0) out.push(`**${labels.examples}**${labels.colon}${examples.join(labels.separator)}`);
   const bullet = (heading: string, values: string[]): void => {
     if (values.length > 0) out.push(`**${heading}**${labels.colon}${values.join(labels.separator)}`);
   };
@@ -187,7 +223,10 @@ function renderChecklist(spec: PromptSpec, labels: Labels): string[] {
   if (spec.carried !== undefined) {
     out.push(`**${labels.carried}**${labels.colon}${spec.carried.text.replace(/\s*\n\s*/gu, ' / ')}`, '');
   }
+  const role = roleLine(spec, labels);
+  if (role !== undefined) out.push(`- [ ] ${kv(labels.role, role, labels)}`);
   out.push(`- [ ] ${kv(labels.objective, itemText(spec.objective, labels), labels)}`);
+  for (const entry of exampleLines(spec, labels)) out.push(`- [ ] ${kv(labels.examples, entry, labels)}`);
   for (const requirement of spec.requirements) out.push(`- [ ] ${line(requirement, labels)}`);
   for (const item of spec.constraints) out.push(`- [ ] ${kv(labels.constraints, line(item, labels), labels)}`);
   for (const item of spec.nonGoals) out.push(`- [ ] ${kv(labels.nonGoals, line(item, labels), labels)}`);
@@ -221,7 +260,8 @@ function renderChat(spec: PromptSpec, labels: Labels): string[] {
     paragraphs.push(`${labels.context}${labels.colon}${body}`);
   }
 
-  let main = spec.objective.text.trim();
+  const role = roleLine(spec, labels);
+  let main = role !== undefined ? `${role}${stop}${spec.objective.text.trim()}` : spec.objective.text.trim();
   if (spec.requirements.length > 0) {
     // No numbering here: this style is prose, and a list marker would also read
     // as an invented literal to the fidelity check.
@@ -255,6 +295,9 @@ function renderChat(spec: PromptSpec, labels: Labels): string[] {
 
   // The one place provenance survives: defaults are stated, in the user's voice,
   // as things the model may choose — not as things the user said.
+  const examples = exampleLines(spec, labels);
+  if (examples.length > 0) paragraphs.push(`${labels.examples}${labels.colon}${examples.join(sep)}`);
+
   const said = paragraphs.join('\n');
   const fresh = spec.assumptions.filter((item) => !said.includes(item.text.trim()));
   if (fresh.length > 0) {

@@ -37,9 +37,9 @@ test('a template sets the intent and the render style', () => {
   assert.equal(next.meta.template, 'image-prompt');
 });
 
-test('template questions never push the open-question count past three', () => {
+test('template questions never push the open-question count past four', () => {
   const next = applyTemplate(spec(), getTemplate('research'));
-  assert.ok(next.openQuestions.length <= 3);
+  assert.ok(next.openQuestions.length <= 4);
 });
 
 test('an unknown template id falls back to default instead of throwing', () => {

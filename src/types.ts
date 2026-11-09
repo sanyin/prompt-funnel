@@ -98,6 +98,10 @@ export interface PromptSpec {
   intent: IntentClass;
   objective: Item;
   context: Item[];
+  /** Who the model should act as, when expertise changes the answer. */
+  role?: Item;
+  /** Input/output pairs showing the shape of the wanted result. */
+  examples?: Array<{ input: string; output: string }>;
   requirements: Requirement[];
   constraints: Item[];
   nonGoals: Item[];
@@ -185,6 +189,10 @@ export interface CompileOptions {
   keepOriginal?: 'auto' | 'on' | 'off';
   /** Intent template id (see `funnel templates`). */
   template?: string;
+  /** Who the model should act as, e.g. "a senior backend engineer". */
+  role?: string;
+  /** `input => output` pairs that show the wanted shape. */
+  examples?: string[];
   /** `warn` (default) reports sensitive spans; `on` replaces them; `off` skips the scan. */
   redact?: 'off' | 'warn' | 'on';
   now?: string;

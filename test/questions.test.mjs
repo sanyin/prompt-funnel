@@ -196,3 +196,40 @@ test('"do not touch" answers land out of scope, not in the requirements', () => 
   assert.equal(next.nonGoals.length, 2);
   assert.ok(!next.requirements.some((item) => item.text.includes('不许改现有接口')));
 });
+
+test('a debug request is asked who should answer', () => {
+  const ids = questionsFor(analyzeWithRules('这个接口报错 E1024，帮我看看')).map((q) => q.id);
+  assert.ok(ids.includes('role'), ids.join(','));
+});
+
+test('a paper is not asked to role-play, it is asked how it is graded', () => {
+  const ids = questionsFor(analyzeWithRules('帮我写一篇关于向量数据库的课程论文')).map((q) => q.id);
+  assert.ok(!ids.includes('role'), ids.join(','));
+  assert.ok(ids.includes('rubric'), ids.join(','));
+});
+
+test('"no role" is an answer, not a role', () => {
+  const spec = analyzeWithRules('这个接口报错 E1024，帮我看看');
+  const next = answerQuestion(spec, 'role', '不需要，按通用助手来');
+  assert.equal(next.role, undefined);
+});
+
+test('saying "plan first" adds a requirement, not a constraint', () => {
+  const spec = analyzeWithRules('帮我做一个后台管理系统');
+  const next = answerQuestion(spec, 'approach', '先给计划，我确认后再做');
+  assert.ok(next.requirements.some((item) => item.text.includes('先给步骤计划')));
+});
+
+test('a role and an example survive into the chat rendering', () => {
+  let spec = analyzeWithRules('帮我看看这个报错为什么不生效');
+  spec = answerQuestion(spec, 'role', '这行的资深从业者');
+  spec.examples = [{ input: '超时', output: '先查上游依赖' }];
+  const text = renderSpec(spec, { style: 'chat' }).text;
+  assert.match(text, /以「这行的资深从业者」/);
+  assert.match(text, /示例：.*超时.*先查上游依赖/);
+});
+
+test('the objective is never repeated as its own background', () => {
+  const spec = analyzeWithRules('帮我看看这个报错为什么不生效');
+  assert.equal(spec.context.length, 0);
+});

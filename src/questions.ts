@@ -111,6 +111,25 @@ export function answerQuestion(spec: PromptSpec, id: string, answer: string | An
         if (!NO_FAILURE_STATED.test(part)) next.acceptance.push({ text: `不出现：${part}`, source: 'user' });
       }
       break;
+    case 'role':
+      // "No role" is an answer, not an empty one: it must not become a line.
+      if (!/^(?:不需要|No role)/u.test(text)) next.role = { text, source: 'user' };
+      break;
+    case 'approach':
+      if (/^(?:直接做|Just do it)/u.test(text)) {
+        // Doing it directly is the default; saying so adds nothing to the prompt.
+      } else if (/计划/u.test(text)) {
+        next.requirements = renumber([
+          ...next.requirements,
+          { id: 'R?', text: '先给步骤计划，等我确认后再执行', source: 'user' },
+        ]);
+      } else {
+        next.requirements = renumber([
+          ...next.requirements,
+          { id: 'R?', text: '先给 2–3 个方案让我对比，再选一个执行', source: 'user' },
+        ]);
+      }
+      break;
     case 'rubric':
       // A marking scheme is a constraint, not a requirement: it says what the
       // artefact must satisfy, not what to build.

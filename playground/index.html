@@ -283,6 +283,15 @@
       }
 
       /* ── advanced ───────────────────────────────────────── */
+      details.extra { margin-top: 14px; border-top: 1px solid var(--line); padding-top: 12px; }
+      details.extra summary { cursor: pointer; font-size: 11.5px; color: var(--faint); letter-spacing: 0.03em; }
+      details.extra summary:hover { color: var(--ink); }
+      .extra-note { margin: 10px 0 8px; font-size: 11.5px; color: var(--faint); }
+      .extra-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+      .extra-grid input {
+        font: inherit; font-size: 12.5px; padding: 7px 10px; border-radius: var(--radius-sm);
+        border: 1px solid var(--line-strong); background: var(--bg); color: var(--ink);
+      }
       details.advanced { margin-top: 18px; border-top: 1px solid var(--line); padding-top: 14px; }
       details.advanced summary { cursor: pointer; font-size: 11.5px; color: var(--faint); letter-spacing: 0.04em; }
       details.advanced summary:hover { color: var(--ink); }
@@ -341,6 +350,15 @@
           <div class="answers" id="answers"></div>
           <div class="questions" id="questions"></div>
           <div class="seeds" id="seeds"></div>
+
+          <details class="extra">
+            <summary>加一个例子（可选，最有效的那种补充）</summary>
+            <p class="extra-note">给一组「输入 → 输出」，比任何形容词都更能说明你要什么。</p>
+            <div class="extra-grid">
+              <input type="text" id="example-in" placeholder="输入：例如 用户说「质量太差」" />
+              <input type="text" id="example-out" placeholder="输出：例如 负面" />
+            </div>
+          </details>
 
           <details class="advanced">
             <summary>高级</summary>
@@ -419,6 +437,8 @@
           const finalized = new Set();
           /** Which text the cache belongs to: answers must survive re-renders. */
           let cacheText = null;
+      /** One optional input/output pair, kept outside the question model. */
+      const examplePair = { input: '', output: '' };
     
           // Remembered choices are a hint, never an automatic answer: preselecting
           // what someone picked last time would let them forget what they agreed to.
@@ -693,6 +713,7 @@
     
           /** Build the spec from the current text, answers and toggles. */
           function computeSpec() {
+        const pairReady = examplePair.input.trim().length > 0 && examplePair.output.trim().length > 0;
             const text = input.value.trim();
             const split = splitContext(text);
             const request = split.separated ? split.request : text;
@@ -703,6 +724,7 @@
               spec.meta.source = text;
             }
             for (const [id, answer] of answers) spec = answerQuestion(spec, id, answer);
+        if (pairReady) spec.examples = [{ input: examplePair.input.trim(), output: examplePair.output.trim() }];
     
             const chosen = getTemplate(templateSel.value);
             if (chosen.id !== 'default') spec = applyTemplate(spec, chosen);
@@ -825,7 +847,19 @@
           templateSel.addEventListener('change', syncStrict);
           syncStrict();
     
-          const copyButton = document.getElementById('copy');
+          const exampleIn = document.getElementById('example-in');
+      const exampleOut = document.getElementById('example-out');
+      for (const field of [exampleIn, exampleOut]) {
+        field.addEventListener('input', () => {
+          examplePair.input = exampleIn.value;
+          examplePair.output = exampleOut.value;
+          // A role or an example is an explicit ask: never pass the text through
+          // untouched while dropping it.
+          render();
+        });
+      }
+
+      const copyButton = document.getElementById('copy');
           copyButton.addEventListener('click', async () => {
             const text = out.textContent ?? '';
             if (text.length === 0) return;

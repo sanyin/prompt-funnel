@@ -114,9 +114,17 @@ async function commandCompile(args: Args): Promise<number> {
   const template = flagValue(args, 'template');
 
   const redact = flagOn(args, 'redact') ? 'on' : flagOn(args, 'no-redact') ? 'off' : 'warn';
+  const roleFlag = flagValue(args, 'role');
+  // Repeatable flags are not supported by the parser; accept a list instead.
+  const exampleFlags = (flagValue(args, 'example') ?? '')
+    .split('|')
+    .map((entry) => entry.trim())
+    .filter((entry) => entry.length > 0);
   const result = await compile(raw, {
     force: flagOn(args, 'force'),
     redact,
+    ...(roleFlag !== undefined ? { role: roleFlag } : {}),
+    ...(exampleFlags.length > 0 ? { examples: exampleFlags } : {}),
     ...(style !== undefined ? { style } : {}),
     ...(engine !== undefined ? { engine } : {}),
     ...(keepOriginal !== undefined ? { keepOriginal } : {}),
