@@ -18,6 +18,8 @@ type Lang = 'zh' | 'en';
 
 interface Labels {
   objective: string;
+  output: string;
+  outputOnly: string;
   role: string;
   examples: string;
   exampleIn: string;
@@ -44,6 +46,8 @@ interface Labels {
 const LABELS: Record<Lang, Labels> = {
   zh: {
     objective: '目标',
+    output: '输出格式',
+    outputOnly: '只输出 JSON，不要任何解释文字。',
     role: '角色',
     examples: '示例',
     exampleIn: '输入',
@@ -68,6 +72,8 @@ const LABELS: Record<Lang, Labels> = {
   },
   en: {
     objective: 'Objective',
+    output: 'Output format',
+    outputOnly: 'Output JSON and nothing else.',
     role: 'Role',
     examples: 'Examples',
     exampleIn: 'input',
@@ -151,6 +157,18 @@ function contextLines(spec: PromptSpec, labels: Labels): string[] {
   return ['<context>', ...body, '</context>'];
 }
 
+/** A JSON contract, when the caller asked for machine-readable output. */
+function outputLine(spec: PromptSpec, labels: Labels): string | undefined {
+  if (spec.output === undefined) return undefined;
+  const zh = labels.colon === '：';
+  const fields = spec.output.fields;
+  if (fields.length === 0) return labels.outputOnly;
+  const list = fields.join(zh ? '、' : ', ');
+  return zh
+    ? `输出 JSON，字段：${list}；不要任何解释文字。`
+    : `Output JSON with these fields: ${list}; no prose around it.`;
+}
+
 /** The default assumptions block, shared by every style. */
 function assumptionBody(spec: PromptSpec, labels: Labels): string[] {
   const block: string[] = [];
@@ -189,6 +207,9 @@ function renderBluf(spec: PromptSpec, labels: Labels): string[] {
 
   out.push(...section(labels.context, contextLines(spec, labels)));
   out.push(...section(labels.examples, exampleLines(spec, labels).map((entry) => `- ${entry}`)));
+
+  const output = outputLine(spec, labels);
+  if (output !== undefined) out.push(`## ${labels.output}`, '', output, '');
 
   if (spec.requirements.length > 0) {
     out.push(`## ${labels.requirements}`, '');
@@ -237,6 +258,8 @@ function renderCompact(spec: PromptSpec, labels: Labels): string[] {
       .filter((item): item is Item => item !== undefined)
       .map((item) => itemText(item, labels)),
   );
+  const output = outputLine(spec, labels);
+  if (output !== undefined) bullet(labels.output, [output]);
   bullet(labels.acceptance, spec.acceptance.map((item) => line(item, labels)));
   bullet(labels.questions, [...spec.openQuestions, ...spec.assumptions.map((item) => item.text)]);
   return out;
@@ -256,6 +279,8 @@ function renderChecklist(spec: PromptSpec, labels: Labels): string[] {
   for (const item of spec.constraints) out.push(`- [ ] ${kv(labels.constraints, line(item, labels), labels)}`);
   for (const item of spec.nonGoals) out.push(`- [ ] ${kv(labels.nonGoals, line(item, labels), labels)}`);
   for (const entry of deliverableLines(spec, labels)) out.push(`- [ ] ${entry.replace(/^- /u, '')}`);
+  const output = outputLine(spec, labels);
+  if (output !== undefined) out.push(`- [ ] ${kv(labels.output, output, labels)}`);
   for (const item of spec.acceptance) out.push(`- [ ] ${kv(labels.acceptance, line(item, labels), labels)}`);
   if (spec.openQuestions.length > 0) {
     out.push(`- [ ] ${kv(labels.questions, spec.openQuestions.join('；'), labels)}`);
@@ -320,6 +345,9 @@ function renderChat(spec: PromptSpec, labels: Labels): string[] {
 
   // The one place provenance survives: defaults are stated, in the user's voice,
   // as things the model may choose — not as things the user said.
+  const output = outputLine(spec, labels);
+  if (output !== undefined) paragraphs.push(output);
+
   const examples = exampleLines(spec, labels);
   if (examples.length > 0) paragraphs.push(`${labels.examples}${labels.colon}${examples.join(sep)}`);
 

@@ -100,6 +100,8 @@ export interface PromptSpec {
   context: Item[];
   /** Who the model should act as, when expertise changes the answer. */
   role?: Item;
+  /** Machine-readable output the caller asked for. */
+  output?: { kind: 'json'; fields: string[] };
   /** Input/output pairs showing the shape of the wanted result. */
   examples?: Array<{ input: string; output: string }>;
   requirements: Requirement[];
@@ -193,6 +195,8 @@ export interface CompileOptions {
   role?: string;
   /** `input => output` pairs that show the wanted shape. */
   examples?: string[];
+  /** Comma-separated JSON field names; enables the JSON output block. */
+  outputFields?: string;
   /** `warn` (default) reports sensitive spans; `on` replaces them; `off` skips the scan. */
   redact?: 'off' | 'warn' | 'on';
   now?: string;

@@ -1,6 +1,6 @@
 {
   "name": "prompt-funnel",
-  "version": "0.12.0",
+  "version": "0.13.0",
   "description": "A convergence gate for AI agents: turn a vague request into a precise, auditable prompt before it reaches the model.",
   "type": "module",
   "bin": {

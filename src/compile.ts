@@ -64,6 +64,16 @@ export async function compile(raw: string, options: CompileOptions = {}, deps: C
       .filter((pair) => pair.input.length > 0 && pair.output.length > 0);
     if (pairs.length > 0) base.examples = pairs;
   }
+  if (options.outputFields !== undefined && options.outputFields.trim().length > 0) {
+    if (options.outputFields.trim() === 'json') base.output = { kind: 'json', fields: [] };
+    else {
+      const fields = options.outputFields
+        .split(/[,，]/u)
+        .map((field) => field.trim())
+        .filter((field) => field.length > 0);
+      if (fields.length > 0) base.output = { kind: 'json', fields };
+    }
+  }
   if (split.separated) {
     // The context is carried verbatim; the request is what gets analysed. The
     // fidelity check still runs against everything the user pasted.
@@ -73,7 +83,8 @@ export async function compile(raw: string, options: CompileOptions = {}, deps: C
 
   // Asking for a role or an example is an explicit instruction to compile:
   // passing through would silently drop what the user just asked for.
-  const explicitStructure = options.role !== undefined || (options.examples?.length ?? 0) > 0;
+  const explicitStructure =
+    options.role !== undefined || (options.examples?.length ?? 0) > 0 || options.outputFields !== undefined;
   if (options.force !== true && options.template === undefined && !explicitStructure && verdict.decision === 'pass') {
     const fidelity = checkFidelity(base, source);
     return {
